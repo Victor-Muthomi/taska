@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/app_strings.dart';
+import '../core/settings/app_settings_providers.dart';
 import '../core/theme/app_theme.dart';
-import '../features/tasks/presentation/pages/tasks_page.dart';
+import '../core/theme/theme_mode_provider.dart';
+import 'home_shell_page.dart';
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(appSettingsProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: AppStrings.appName,
       theme: AppTheme.light(),
-      home: const TasksPage(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
+      home: const HomeShellPage(),
     );
   }
 }
