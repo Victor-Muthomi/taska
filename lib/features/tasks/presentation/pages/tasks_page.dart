@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/analytics/behavior_analytics.dart';
 import '../../../../core/analytics/behavior_analytics_providers.dart';
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/export/export_providers.dart';
 import '../../../../core/notifications/notification_logic.dart';
 import '../../../../core/notifications/notification_providers.dart';
 import '../../../../core/scheduling/slot_schedule.dart';
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_providers.dart';
-import '../widgets/task_data_actions.dart';
 
 class TasksPage extends ConsumerWidget {
   const TasksPage({super.key, this.embedded = false});
@@ -47,6 +43,8 @@ class TasksPage extends ConsumerWidget {
               existingTask: existingTask,
               scheduledFor: scheduledFor,
               ref: bottomSheetRef,
+              initialScheduledFor:
+                  scheduledFor ?? existingTask?.nextReminderAt ?? DateTime.now(),
             );
           },
         );
@@ -118,6 +116,8 @@ class TasksPage extends ConsumerWidget {
     final timeController = TextEditingController(
       text: existingTask?.timeLabel ?? '08:00',
     );
+    final initialScheduledFor =
+        scheduledFor ?? existingTask?.nextReminderAt ?? DateTime.now();
     var selectedSlot = existingTask?.slot ?? TaskSlot.morning;
     var selectedRepeat = existingTask?.repeat ?? TaskRepeat.none;
 
@@ -133,6 +133,7 @@ class TasksPage extends ConsumerWidget {
         timeController: timeController,
         initialSlot: selectedSlot,
         initialRepeat: selectedRepeat,
+        initialScheduledFor: initialScheduledFor,
       ),
     );
   }
@@ -148,6 +149,7 @@ class _TaskFormSheet extends StatefulWidget {
     this.timeController,
     this.initialSlot = TaskSlot.morning,
     this.initialRepeat = TaskRepeat.none,
+    required this.initialScheduledFor,
   });
 
   final WidgetRef ref;
@@ -158,6 +160,7 @@ class _TaskFormSheet extends StatefulWidget {
   final TextEditingController? timeController;
   final TaskSlot initialSlot;
   final TaskRepeat initialRepeat;
+  final DateTime initialScheduledFor;
 
   @override
   State<_TaskFormSheet> createState() => _TaskFormSheetState();
@@ -167,9 +170,11 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
+  late final TextEditingController _dateController;
   late final TextEditingController _timeController;
   late TaskSlot _selectedSlot;
   late TaskRepeat _selectedRepeat;
+  late DateTime _selectedDate;
   bool _isSaving = false;
 
   @override
@@ -186,6 +191,8 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
         TextEditingController(text: widget.existingTask?.timeLabel ?? '08:00');
     _selectedSlot = widget.initialSlot;
     _selectedRepeat = widget.initialRepeat;
+    _selectedDate = DateUtils.dateOnly(widget.initialScheduledFor);
+    _dateController = TextEditingController(text: _formatDate(_selectedDate));
   }
 
   @override
@@ -196,6 +203,7 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
     if (widget.notesController == null) {
       _notesController.dispose();
     }
+    _dateController.dispose();
     if (widget.timeController == null) {
       _timeController.dispose();
     }
@@ -260,6 +268,33 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
                     return 'Use at least 3 characters so the task is easy to spot.';
                   }
                   return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _dateController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Date',
+                  helperText: 'Pick the day this task should start on.',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today_outlined),
+                ),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked == null) {
+                    return;
+                  }
+
+                  setState(() {
+                    _selectedDate = DateUtils.dateOnly(picked);
+                    _dateController.text = _formatDate(_selectedDate);
+                  });
                 },
               ),
               const SizedBox(height: 12),
@@ -406,7 +441,7 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
               timeLabel: _timeController.text,
               slot: _selectedSlot,
               repeat: _selectedRepeat,
-              scheduledFor: widget.scheduledFor,
+              scheduledFor: _selectedDate,
             );
       } else {
         await widget.ref
@@ -418,7 +453,7 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
               timeLabel: _timeController.text,
               slot: _selectedSlot,
               repeat: _selectedRepeat,
-              scheduledFor: widget.scheduledFor,
+              scheduledFor: _selectedDate,
             );
       }
 
@@ -440,6 +475,13 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
       }
     }
   }
+}
+
+String _formatDate(DateTime date) {
+  final year = date.year.toString();
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
 }
 
 class _FormInfoBanner extends StatelessWidget {
@@ -491,10 +533,8 @@ class _DashboardView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _TopActions(),
-                const SizedBox(height: 16),
                 Text(
-                  'Home',
+                  'Manage your day',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
@@ -863,10 +903,18 @@ class _TaskCard extends ConsumerWidget {
                       onPressed: () async {
                         await ref
                             .read(tasksControllerProvider.notifier)
-                            .snoozeTask(task);
+                            .toggleSnoozeTask(task);
                       },
-                      icon: const Icon(Icons.snooze_outlined),
-                      label: const Text('Snooze'),
+                      icon: Icon(
+                        task.status == TaskReminderStatus.snoozed
+                            ? Icons.notifications_active_outlined
+                            : Icons.snooze_outlined,
+                      ),
+                      label: Text(
+                        task.status == TaskReminderStatus.snoozed
+                            ? 'Unsnooze'
+                            : 'Snooze',
+                      ),
                     ),
                   ),
                 ],
@@ -909,65 +957,6 @@ class _MetaChip extends StatelessWidget {
     );
   }
 }
-
-class _TopActions extends ConsumerWidget {
-  const _TopActions();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      children: [
-        IconButton.filledTonal(
-          onPressed: () {
-            ref.read(appSettingsProvider.notifier).toggleThemeMode();
-          },
-          icon: Icon(
-            Theme.of(context).brightness == Brightness.dark
-                ? Icons.light_mode_outlined
-                : Icons.dark_mode_outlined,
-          ),
-        ),
-        const SizedBox(width: 8),
-        PopupMenuButton<_DataAction>(
-          tooltip: 'Data actions',
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: _DataAction.exportJson,
-              child: Text('Export JSON'),
-            ),
-            PopupMenuItem(
-              value: _DataAction.shareExport,
-              child: Text('Share Export'),
-            ),
-            PopupMenuItem(
-              value: _DataAction.importJson,
-              child: Text('Import JSON'),
-            ),
-            PopupMenuItem(
-              value: _DataAction.restoreLatest,
-              child: Text('Restore Latest Backup'),
-            ),
-          ],
-          onSelected: (action) async {
-            switch (action) {
-              case _DataAction.exportJson:
-                await exportTasksJson(context, ref, shareAfterExport: false);
-              case _DataAction.shareExport:
-                await exportTasksJson(context, ref, shareAfterExport: true);
-              case _DataAction.importJson:
-                await importTasksJson(context, ref);
-              case _DataAction.restoreLatest:
-                await restoreLatestBackup(context, ref);
-            }
-          },
-          icon: const Icon(Icons.ios_share_outlined),
-        ),
-      ],
-    );
-  }
-}
-
-enum _DataAction { exportJson, shareExport, importJson, restoreLatest }
 
 class _EmptyTasksState extends StatelessWidget {
   const _EmptyTasksState();

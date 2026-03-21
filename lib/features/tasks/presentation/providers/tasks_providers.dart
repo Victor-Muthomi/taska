@@ -212,6 +212,34 @@ class TasksController extends AsyncNotifier<List<Task>> {
     state = AsyncData(await _refreshTasks());
   }
 
+  Future<void> unsnoozeTask(Task task) async {
+    final taskId = task.id;
+    if (taskId == null) {
+      return;
+    }
+
+    final logs = await ref.read(getTaskLogsUseCaseProvider).call(taskId);
+    final updatedTask = ref
+        .read(reminderEngineProvider)
+        .applyUnsnooze(task, logs);
+    await ref.read(tasksRepositoryProvider).updateTask(updatedTask);
+    await ref.read(notificationServiceProvider).cancelTaskNotification(taskId);
+    await scheduleReminder(
+      updatedTask,
+      logAction: 'notification_unsnoozed',
+    );
+    state = AsyncData(await _refreshTasks());
+  }
+
+  Future<void> toggleSnoozeTask(Task task) async {
+    if (task.status == TaskReminderStatus.snoozed) {
+      await unsnoozeTask(task);
+      return;
+    }
+
+    await snoozeTask(task);
+  }
+
   Future<void> delete(int taskId) async {
     await ref
         .read(logTaskActionUseCaseProvider)
@@ -222,7 +250,11 @@ class TasksController extends AsyncNotifier<List<Task>> {
     state = AsyncData(await _refreshTasks());
   }
 
-  Future<void> scheduleReminder(Task task, {ReminderPriority? priority}) async {
+  Future<void> scheduleReminder(
+    Task task, {
+    ReminderPriority? priority,
+    String logAction = 'notification_scheduled',
+  }) async {
     await ref
         .read(notificationServiceProvider)
         .scheduleTaskNotification(
@@ -238,7 +270,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
           .call(
             TaskLog(
               taskId: taskId,
-              action: 'notification_scheduled',
+              action: logAction,
               loggedAt: DateTime.now(),
             ),
           );

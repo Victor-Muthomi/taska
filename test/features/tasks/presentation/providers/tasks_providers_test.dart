@@ -125,6 +125,94 @@ void main() {
     expect(created.nextReminderAt.month, scheduledFor.month);
     expect(created.nextReminderAt.day, scheduledFor.day);
   });
+
+  test('toggleSnoozeTask snoozes a pending task', () async {
+    final before = DateTime.now();
+    final repository = _FakeTasksRepository(
+      tasks: [
+        Task(
+          id: 1,
+          title: 'Focus block',
+          notes: null,
+          timeLabel: '10:00',
+          slot: TaskSlot.morning,
+          repeat: TaskRepeat.none,
+          status: TaskReminderStatus.pending,
+          createdAt: before,
+          updatedAt: before,
+          nextReminderAt: before,
+          reminderIntervalMinutes: 120,
+          reminderIntensity: TaskReminderIntensity.normal,
+          ignoredCount: 0,
+          completionRate: 0,
+        ),
+      ],
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        tasksRepositoryProvider.overrideWithValue(repository),
+        notificationServiceProvider.overrideWithValue(_FakeNotificationService()),
+        appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
+        initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(tasksControllerProvider.future);
+
+    await container
+        .read(tasksControllerProvider.notifier)
+        .toggleSnoozeTask(repository.tasks.single);
+
+    final updated = repository.tasks.single;
+    expect(updated.status, TaskReminderStatus.snoozed);
+    expect(updated.nextReminderAt.isAfter(before), isTrue);
+  });
+
+  test('toggleSnoozeTask unsnoozes a snoozed task', () async {
+    final before = DateTime.now();
+    final repository = _FakeTasksRepository(
+      tasks: [
+        Task(
+          id: 1,
+          title: 'Focus block',
+          notes: null,
+          timeLabel: '10:00',
+          slot: TaskSlot.morning,
+          repeat: TaskRepeat.none,
+          status: TaskReminderStatus.snoozed,
+          createdAt: before,
+          updatedAt: before,
+          nextReminderAt: before.add(const Duration(minutes: 10)),
+          reminderIntervalMinutes: 120,
+          reminderIntensity: TaskReminderIntensity.normal,
+          ignoredCount: 0,
+          completionRate: 0,
+        ),
+      ],
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        tasksRepositoryProvider.overrideWithValue(repository),
+        notificationServiceProvider.overrideWithValue(_FakeNotificationService()),
+        appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
+        initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(tasksControllerProvider.future);
+
+    await container
+        .read(tasksControllerProvider.notifier)
+        .toggleSnoozeTask(repository.tasks.single);
+
+    final updated = repository.tasks.single;
+    expect(updated.status, TaskReminderStatus.pending);
+    expect(updated.nextReminderAt.isAfter(before), isTrue);
+  });
 }
 
 class _FakeTasksRepository implements TasksRepository {

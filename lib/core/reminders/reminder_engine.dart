@@ -92,6 +92,10 @@ class ReminderEngine {
     );
   }
 
+  Task applyUnsnooze(Task task, List<TaskLog> logs) {
+    return scheduleNextReminder(task, logs);
+  }
+
   Task applyIgnored(Task task, List<TaskLog> logs) {
     final ignoredCount = task.ignoredCount + 1;
     final completionRate = computeCompletionRate(logs);

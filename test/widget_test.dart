@@ -12,6 +12,7 @@ import 'package:taska/core/settings/app_settings_storage.dart';
 import 'package:taska/features/tasks/domain/entities/task.dart';
 import 'package:taska/features/tasks/domain/entities/task_log.dart';
 import 'package:taska/features/tasks/domain/repositories/tasks_repository.dart';
+import 'package:taska/features/tasks/presentation/pages/tasks_page.dart';
 import 'package:taska/features/tasks/presentation/providers/tasks_providers.dart';
 
 void main() {
@@ -58,6 +59,8 @@ void main() {
     await tester.tap(find.text('Add Task'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Date'), findsOneWidget);
+
     final saveButton = find.widgetWithText(FilledButton, 'Save Task');
     await tester.ensureVisible(saveButton);
     await tester.tap(saveButton, warnIfMissed: false);
@@ -71,6 +74,50 @@ void main() {
 
     final tasks = await repository.getTasks();
     expect(tasks.map((task) => task.title), contains('Morning review'));
+  });
+
+  testWidgets('dashboard add task form shows editable date field', (
+    WidgetTester tester,
+  ) async {
+    final repository = _FakeTasksRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tasksRepositoryProvider.overrideWithValue(repository),
+          appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
+          notificationServiceProvider.overrideWithValue(
+            _FakeNotificationService(),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  return FilledButton(
+                    onPressed: () {
+                      TasksPage.showTaskFormSheet(
+                        context,
+                        ref: ref,
+                        scheduledFor: DateTime(2026, 3, 24),
+                      );
+                    },
+                    child: const Text('Open form'),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open form'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Date'), findsOneWidget);
+    expect(find.text('2026-03-24'), findsOneWidget);
   });
 
   testWidgets('shell navigates to stats and settings and toggles dark mode', (
