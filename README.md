@@ -1,15 +1,45 @@
 # Taska
 
-Taska is an offline-first Flutter app for flexible, slot-based task reminders. Instead of relying on one exact alarm time, it helps people stay on top of morning, afternoon, and evening time windows, then adapts reminders based on what they complete, snooze, or ignore.
+Taska is an offline-first Flutter app for flexible, slot-based task reminders.
+
+It is designed around a simple idea: most tasks do not belong to one fragile alarm time. They belong to a window of the day. Taska helps you plan around the real flow of your schedule by organizing tasks into morning, afternoon, and evening slots, then adapting reminders based on what you complete, snooze, or ignore.
+
+## Why Taska Exists
+
+Many reminder apps assume you will always act at an exact minute. In practice, that is often the wrong model.
+
+Taska focuses on:
+
+- Reminder windows instead of one fixed point in time
+- Local, private storage instead of a cloud-first workflow
+- Behavior-aware scheduling that learns from completion and snooze patterns
+- Lightweight planning tools that stay simple enough to use every day
+
+The result is a task manager that feels practical for real routines: flexible, private, and dependable even when your day shifts around.
 
 ## What It Does
 
-- Organizes tasks into time windows: morning, afternoon, and evening
-- Stores everything locally with SQLite
-- Schedules local notifications with snooze support
-- Adapts reminder timing and intensity from behavior
-- Tracks lightweight analytics like completion rate and most active time
-- Supports dark mode, JSON export/import, backup restore, and local settings
+- Organizes tasks into clear time windows: morning, afternoon, and evening
+- Stores task data locally with SQLite
+- Schedules local notifications for reminder delivery
+- Supports snooze and unsnooze flows, including date selection in the task form
+- Adapts reminder timing and intensity based on user behavior
+- Tracks lightweight analytics such as completion rate and most active time
+- Supports dark mode, JSON export/import, backup restore, and local settings persistence
+
+## Core Experience
+
+Taska is built to stay out of your way while still keeping your schedule visible.
+
+You can:
+
+- Add a task to the part of the day where it actually belongs
+- Let the app remind you locally without needing a server account
+- Snooze tasks when the timing is off, then bring them back when it makes sense
+- Export your data for backup or move it between devices
+- Review basic trends to understand when you are most consistent
+
+This makes Taska useful for people who want reminders that adapt to life instead of fighting it.
 
 ## Tech Stack
 
@@ -21,12 +51,18 @@ Taska is an offline-first Flutter app for flexible, slot-based task reminders. I
 
 ## Project Structure
 
-The app follows a clean, feature-first layout under [`lib/`](/home/frappe/taska/lib):
+The app follows a feature-first layout under [`lib/`](lib/):
 
 - `app/`: application shell and bootstrap
 - `core/`: shared services such as database, reminders, notifications, analytics, export, theme, and settings
 - `features/tasks/`: task domain, data layer, and presentation
-- `features/settings/`: release-facing user preferences UI
+- `features/settings/`: user preferences and release-facing settings UI
+
+The repository also includes release support documents under [`docs/`](docs/):
+
+- [`docs/release_notes.md`](docs/release_notes.md)
+- [`docs/play_store_metadata.md`](docs/play_store_metadata.md)
+- [`docs/release_checklist.md`](docs/release_checklist.md)
 
 ## Getting Started
 
@@ -64,14 +100,22 @@ Taska uses local notifications and exact alarms for reminder delivery. On Androi
 - `USE_EXACT_ALARM`
 - `RECEIVE_BOOT_COMPLETED`
 
-Those permissions are already configured in [`AndroidManifest.xml`](/home/frappe/taska/android/app/src/main/AndroidManifest.xml). Device-level validation is still tracked in [`docs/release_checklist.md`](/home/frappe/taska/docs/release_checklist.md).
+These permissions are configured in [`android/app/src/main/AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml). Device-level validation is still tracked in [`docs/release_checklist.md`](docs/release_checklist.md).
 
 ## Release Notes
 
-- Android currently builds with debug signing for release configuration to simplify local testing.
-- Play Store listing copy and permission messaging are documented in [`docs/play_store_metadata.md`](/home/frappe/taska/docs/play_store_metadata.md).
-- The release checklist is documented in [`docs/release_checklist.md`](/home/frappe/taska/docs/release_checklist.md).
+- Current release notes are documented in [`docs/release_notes.md`](docs/release_notes.md).
+- Play Store listing copy and permission messaging are documented in [`docs/play_store_metadata.md`](docs/play_store_metadata.md).
+- The release checklist is documented in [`docs/release_checklist.md`](docs/release_checklist.md).
 
 ## Current Status
 
-Taska is feature-complete for MVP and has passing static analysis and automated tests. The main work still pending before a public release is real-device validation of notification behavior across Android scenarios.
+Taska is feature-complete for MVP and has passing static analysis and automated tests.
+
+The main work still pending before a public release is real-device validation of notification behavior across Android scenarios.
+
+## Notes for Release
+
+- Android currently builds with debug signing for release configuration to simplify local testing.
+- Store listing copy and privacy-oriented messaging are already prepared in the release support docs.
+- The app is designed to keep user data local on device and avoid an account requirement for core reminder features.

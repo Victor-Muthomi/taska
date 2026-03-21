@@ -16,6 +16,30 @@ migrate_working_dir/
 project_idea/
 **/local.properties
 
+# Flutter / Dart generated files and local build artifacts
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.pub-cache/
+.metadata
+.dart_tool/
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Platform-generated build outputs
+android/.gradle/
+/android/app/debug
+/android/app/profile
+/android/app/release
+/ios/Flutter/ephemeral/
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/linux/flutter/ephemeral/
+/macos/Flutter/ephemeral/
+/windows/flutter/ephemeral/
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -28,22 +52,9 @@ project_idea/
 #.vscode/
 
 # Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
 # Symbolication related
 app.*.symbols
 
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
