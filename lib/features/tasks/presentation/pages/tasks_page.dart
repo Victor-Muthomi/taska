@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/analytics/behavior_analytics.dart';
-import '../../../../core/analytics/behavior_analytics_providers.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/notifications/notification_logic.dart';
 import '../../../../core/notifications/notification_providers.dart';
@@ -55,7 +53,6 @@ class TasksPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksState = ref.watch(tasksControllerProvider);
-    final behaviorInsight = ref.watch(behaviorInsightProvider);
     final settings = ref.watch(appSettingsProvider);
 
     ref.listen(notificationEventsProvider, (previous, next) {
@@ -74,17 +71,29 @@ class TasksPage extends ConsumerWidget {
           NotificationEventType.snoozed =>
             'Reminder snoozed for ${settings.defaultSnoozeMinutes} minutes',
         };
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       });
     });
 
     final body = tasksState.when(
-      data: (tasks) =>
-          _DashboardView(tasks: tasks, behaviorInsight: behaviorInsight),
+      data: (tasks) => _DashboardView(tasks: tasks),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Failed to load tasks: $error')),
+    );
+
+    if (embedded) {
+      return SafeArea(child: body);
+    }
+
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showTaskFormSheet(context, ref),
+        icon: const Icon(Icons.add_task_rounded),
+        label: const Text('Add Task'),
+      ),
+      body: SafeArea(child: body),
     );
 
     if (embedded) {
@@ -298,6 +307,36 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
                 },
               ),
               const SizedBox(height: 12),
+              DropdownButtonFormField<TaskSlot>(
+                initialValue: _selectedSlot,
+                decoration: InputDecoration(
+                  labelText: 'Slot',
+                  helperText:
+                      'Window: ${SlotSchedule.labelForWindow(SlotSchedule.windows[_selectedSlot]!)}',
+                  border: const OutlineInputBorder(),
+                ),
+                items: TaskSlot.values
+                    .map(
+                      (slot) => DropdownMenuItem(
+                        value: slot,
+                        child: Text(_slotLabel(slot)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _selectedSlot = value;
+                    _timeController.text = SlotSchedule.normalizeTimeForSlot(
+                      _timeController.text,
+                      value,
+                    );
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _timeController,
                 readOnly: true,
@@ -328,36 +367,6 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
                     _timeController.text = SlotSchedule.normalizeTimeForSlot(
                       _formatTimeOfDay(picked),
                       _selectedSlot,
-                    );
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<TaskSlot>(
-                initialValue: _selectedSlot,
-                decoration: InputDecoration(
-                  labelText: 'Slot',
-                  helperText:
-                      'Window: ${SlotSchedule.labelForWindow(SlotSchedule.windows[_selectedSlot]!)}',
-                  border: const OutlineInputBorder(),
-                ),
-                items: TaskSlot.values
-                    .map(
-                      (slot) => DropdownMenuItem(
-                        value: slot,
-                        child: Text(_slotLabel(slot)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  setState(() {
-                    _selectedSlot = value;
-                    _timeController.text = SlotSchedule.normalizeTimeForSlot(
-                      _timeController.text,
-                      value,
                     );
                   });
                 },
@@ -512,14 +521,13 @@ class _FormInfoBanner extends StatelessWidget {
 }
 
 class _DashboardView extends StatelessWidget {
-  const _DashboardView({required this.tasks, required this.behaviorInsight});
+  const _DashboardView({required this.tasks});
 
   final List<Task> tasks;
-  final AsyncValue<BehaviorInsight> behaviorInsight;
 
   @override
   Widget build(BuildContext context) {
-    final todaysTasks = tasks.where(_isTodayTask).toList();
+    final todaysTasks = tasks.where(_shouldShowOnHome).toList();
     final grouped = {
       for (final slot in TaskSlot.values)
         slot: todaysTasks.where((task) => task.slot == slot).toList(),
@@ -562,11 +570,6 @@ class _DashboardView extends StatelessWidget {
                   },
                   child: _DashboardSummary(tasks: todaysTasks),
                 ),
-                const SizedBox(height: 16),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _BehaviorInsights(behaviorInsight: behaviorInsight),
-                ),
               ],
             ),
           ),
@@ -588,83 +591,6 @@ class _DashboardView extends StatelessWidget {
             ),
         const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
       ],
-    );
-  }
-}
-
-class _BehaviorInsights extends StatelessWidget {
-  const _BehaviorInsights({required this.behaviorInsight});
-
-  final AsyncValue<BehaviorInsight> behaviorInsight;
-
-  @override
-  Widget build(BuildContext context) {
-    return behaviorInsight.when(
-      data: (insight) {
-        return Card(
-          key: ValueKey(insight.suggestion),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Behavior Analytics',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MetaChip(
-                      icon: Icons.checklist_rounded,
-                      label:
-                          'Completion ${(insight.completionRate * 100).round()}%',
-                    ),
-                    _MetaChip(
-                      icon: Icons.bolt_outlined,
-                      label: insight.mostActiveHour == null
-                          ? 'Most active time pending'
-                          : 'Most active ${_formatHour(insight.mostActiveHour!)}',
-                    ),
-                    _MetaChip(
-                      icon: Icons.tips_and_updates_outlined,
-                      label: insight.suggestedSlot == null
-                          ? 'Current slots fit well'
-                          : 'Suggest ${_slotLabel(insight.suggestedSlot!)}',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  insight.suggestion,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                if (insight.overloadWarning != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    insight.overloadWarning!,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: LinearProgressIndicator(),
-        ),
-      ),
-      error: (error, _) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text('Analytics unavailable: $error'),
-        ),
-      ),
     );
   }
 }
@@ -810,116 +736,162 @@ class _TaskSlotSection extends StatelessWidget {
   }
 }
 
-class _TaskCard extends ConsumerWidget {
+class _TaskCard extends ConsumerStatefulWidget {
   const _TaskCard({required this.task});
 
   final Task task;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      margin: const EdgeInsets.only(bottom: 12),
+  ConsumerState<_TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends ConsumerState<_TaskCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final task = widget.task;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
       child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          task.title,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _MetaChip(
-                              icon: Icons.schedule_outlined,
-                              label: task.timeLabel,
-                            ),
-                            _MetaChip(
-                              icon: Icons.wb_sunny_outlined,
-                              label:
-                                  '${_slotLabel(task.slot)} ${_slotWindowLabel(task.slot)}',
-                            ),
-                            _MetaChip(
-                              icon: Icons.repeat_rounded,
-                              label: _repeatLabel(task.repeat),
-                            ),
-                            _MetaChip(
-                              icon: Icons.notifications_active_outlined,
-                              label: _statusLabel(task.status),
-                            ),
-                          ],
-                        ),
-                        if (task.notes != null && task.notes!.isNotEmpty) ...[
-                          const SizedBox(height: 10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            task.notes!,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            task.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _MetaChip(
+                                icon: Icons.schedule_outlined,
+                                label: task.timeLabel,
+                              ),
+                              _MetaChip(
+                                icon: Icons.notifications_active_outlined,
+                                label: _statusLabel(task.status),
+                              ),
+                            ],
                           ),
                         ],
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () =>
-                        _showTaskFormSheet(context, ref, existingTask: task),
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Next reminder ${_formatReminderTime(task.nextReminderAt)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () async {
-                        await ref
-                            .read(tasksControllerProvider.notifier)
-                            .markTaskDone(task);
-                      },
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('Done'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await ref
-                            .read(tasksControllerProvider.notifier)
-                            .toggleSnoozeTask(task);
-                      },
-                      icon: Icon(
-                        task.status == TaskReminderStatus.snoozed
-                            ? Icons.notifications_active_outlined
-                            : Icons.snooze_outlined,
-                      ),
-                      label: Text(
-                        task.status == TaskReminderStatus.snoozed
-                            ? 'Unsnooze'
-                            : 'Snooze',
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _expanded
+                      ? Padding(
+                          key: const ValueKey('expanded'),
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _MetaChip(
+                                    icon: Icons.wb_sunny_outlined,
+                                    label:
+                                        '${_slotLabel(task.slot)} ${_slotWindowLabel(task.slot)}',
+                                  ),
+                                  _MetaChip(
+                                    icon: Icons.repeat_rounded,
+                                    label: _repeatLabel(task.repeat),
+                                  ),
+                                ],
+                              ),
+                              if (task.notes != null && task.notes!.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  task.notes!,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              Text(
+                                'Next reminder ${_formatReminderTime(task.nextReminderAt)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: () async {
+                                        await ref
+                                            .read(tasksControllerProvider.notifier)
+                                            .markTaskDone(task);
+                                      },
+                                      icon: const Icon(Icons.check_circle_outline),
+                                      label: const Text('Done'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await ref
+                                            .read(tasksControllerProvider.notifier)
+                                            .toggleSnoozeTask(task);
+                                      },
+                                      icon: Icon(
+                                        task.status == TaskReminderStatus.snoozed
+                                            ? Icons.notifications_active_outlined
+                                            : Icons.snooze_outlined,
+                                      ),
+                                      label: Text(
+                                        task.status == TaskReminderStatus.snoozed
+                                            ? 'Unsnooze'
+                                            : 'Snooze',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () => _showTaskFormSheet(
+                                    context,
+                                    ref,
+                                    existingTask: task,
+                                  ),
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Edit'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('collapsed')),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -975,14 +947,14 @@ class _EmptyTasksState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Start with one task in a morning, afternoon, or evening window and Taska will keep the reminder flexible inside that slot.',
+              'Start with one task in a morning, afternoon, evening, or night window and Taska will keep the reminder flexible inside that slot.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             const _FormInfoBanner(
               icon: Icons.lightbulb_outline,
               message:
-                  'Try adding a small recurring routine first, like a morning check-in or evening review, so the reminder engine has behavior to learn from.',
+              'Try adding a small recurring routine first, like a morning check-in or night review, so the reminder engine has behavior to learn from.',
             ),
           ],
         ),
@@ -991,7 +963,11 @@ class _EmptyTasksState extends StatelessWidget {
   }
 }
 
-bool _isTodayTask(Task task) {
+bool _shouldShowOnHome(Task task) {
+  if (task.status == TaskReminderStatus.completed) {
+    return false;
+  }
+
   final now = DateTime.now();
   final date = task.nextReminderAt;
   return date.year == now.year &&
@@ -1007,6 +983,8 @@ String _slotLabel(TaskSlot slot) {
       return 'Afternoon';
     case TaskSlot.evening:
       return 'Evening';
+    case TaskSlot.night:
+      return 'Night';
   }
 }
 
@@ -1030,13 +1008,13 @@ String _repeatLabel(TaskRepeat repeat) {
 String _statusLabel(TaskReminderStatus status) {
   switch (status) {
     case TaskReminderStatus.pending:
-      return 'Pending';
+      return 'pending';
     case TaskReminderStatus.completed:
-      return 'Done';
+      return 'done';
     case TaskReminderStatus.snoozed:
-      return 'Snoozed';
+      return 'snoozed';
     case TaskReminderStatus.ignored:
-      return 'Ignored';
+      return 'ignored';
   }
 }
 

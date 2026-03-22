@@ -18,7 +18,10 @@ class StatsPage extends ConsumerWidget {
 
     final body = tasksState.when(
       data: (tasks) => insightState.when(
-        data: (insight) => _StatsBody(tasks: tasks, insight: insight),
+        data: (insight) => _StatsBody(
+          tasks: tasks,
+          insight: insight,
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Stats unavailable: $error')),
       ),
@@ -64,6 +67,8 @@ class _StatsBody extends StatelessWidget {
           'A quick read on how your schedule is actually behaving.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
+        const SizedBox(height: 16),
+        _BehaviorInsights(behaviorInsight: AsyncValue.data(insight)),
         const SizedBox(height: 20),
         Text('Overview', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
@@ -141,6 +146,98 @@ class _StatsBody extends StatelessWidget {
   }
 }
 
+class _BehaviorInsights extends StatelessWidget {
+  const _BehaviorInsights({required this.behaviorInsight});
+
+  final AsyncValue<BehaviorInsight> behaviorInsight;
+
+  @override
+  Widget build(BuildContext context) {
+    return behaviorInsight.when(
+      data: (insight) {
+        return Card(
+          key: ValueKey(insight.suggestion),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Behavior Analytics',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _MetaChip(
+                      icon: Icons.checklist_rounded,
+                      label:
+                          'Completion ${(insight.completionRate * 100).round()}%',
+                    ),
+                    _MetaChip(
+                      icon: Icons.bolt_outlined,
+                      label: insight.mostActiveHour == null
+                          ? 'Most active time pending'
+                          : 'Most active ${_formatHour(insight.mostActiveHour!)}',
+                    ),
+                    _MetaChip(
+                      icon: Icons.tips_and_updates_outlined,
+                      label: insight.suggestedSlot == null
+                          ? 'Current slots fit well'
+                          : 'Suggest ${_slotLabel(insight.suggestedSlot!)}',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  insight.suggestion,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (insight.overloadWarning != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    insight.overloadWarning!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: LinearProgressIndicator(),
+        ),
+      ),
+      error: (error, _) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text('Analytics unavailable: $error'),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+    );
+  }
+}
+
 class _StatsCard extends StatelessWidget {
   const _StatsCard({
     required this.label,
@@ -180,6 +277,8 @@ String _slotLabel(TaskSlot slot) {
       return 'Afternoon';
     case TaskSlot.evening:
       return 'Evening';
+    case TaskSlot.night:
+      return 'Night';
   }
 }
 

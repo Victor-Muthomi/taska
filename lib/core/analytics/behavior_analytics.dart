@@ -127,6 +127,9 @@ class BehaviorAnalytics {
   }
 
   TaskSlot _slotForHour(int hour) {
+    if (hour >= 22 || hour < 6) {
+      return TaskSlot.night;
+    }
     if (hour >= 6 && hour < 12) {
       return TaskSlot.morning;
     }
@@ -144,6 +147,8 @@ class BehaviorAnalytics {
         return 'Afternoon';
       case TaskSlot.evening:
         return 'Evening';
+      case TaskSlot.night:
+        return 'Night';
     }
   }
 

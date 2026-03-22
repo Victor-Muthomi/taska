@@ -162,7 +162,7 @@ class SettingsPage extends ConsumerWidget {
                   const SizedBox(height: 12),
                   for (final slot in TaskSlot.values) ...[
                     _SlotWindowTile(slot: slot),
-                    if (slot != TaskSlot.evening) const Divider(height: 20),
+                    if (slot != TaskSlot.night) const Divider(height: 20),
                   ],
                 ],
               ),
@@ -181,7 +181,7 @@ class SettingsPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Your current windows are Morning ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.morning]!)}, Afternoon ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.afternoon]!)}, and Evening ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.evening]!)}.',
+                    'Your current windows are Morning ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.morning]!)}, Afternoon ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.afternoon]!)}, Evening ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.evening]!)}, and Night ${SlotSchedule.labelForWindow(settings.slotWindows[TaskSlot.night]!) }.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -295,5 +295,6 @@ String _slotLabel(TaskSlot slot) {
     TaskSlot.morning => 'Morning',
     TaskSlot.afternoon => 'Afternoon',
     TaskSlot.evening => 'Evening',
+    TaskSlot.night => 'Night',
   };
 }

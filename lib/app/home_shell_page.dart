@@ -39,7 +39,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard_rounded),
-                label: 'Home',
+            label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.list_alt_outlined),

@@ -1,4 +1,4 @@
-enum TaskSlot { morning, afternoon, evening }
+enum TaskSlot { morning, afternoon, evening, night }
 
 enum TaskReminderStatus { pending, completed, snoozed, ignored }
 

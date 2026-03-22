@@ -199,6 +199,7 @@ class ReminderEngine {
       TaskSlot.morning => 180,
       TaskSlot.afternoon => 150,
       TaskSlot.evening => 120,
+      TaskSlot.night => 90,
     };
   }
 

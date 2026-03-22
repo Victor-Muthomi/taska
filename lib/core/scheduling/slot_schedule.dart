@@ -54,6 +54,12 @@ class SlotSchedule {
       endHour: 22,
       endMinute: 0,
     ),
+    TaskSlot.night: SlotWindow(
+      startHour: 22,
+      startMinute: 1,
+      endHour: 5,
+      endMinute: 59,
+    ),
   };
 
   static Map<TaskSlot, SlotWindow> _windows = {
@@ -74,12 +80,38 @@ class SlotSchedule {
     final minutes = time.hour * 60 + time.minute;
     final window = windows[slot]!;
     final start = window.startHour * 60 + window.startMinute;
-    final endExclusive = window.endHour * 60 + window.endMinute;
-    final clamped = minutes < start
-        ? start
-        : (minutes >= endExclusive ? endExclusive - 1 : minutes);
+    final end = window.endHour * 60 + window.endMinute;
+    final clamped = _normalizeMinutesForWindow(
+      minutes: minutes,
+      start: start,
+      end: end,
+    );
 
     return formatHourMinute(hour: clamped ~/ 60, minute: clamped % 60);
+  }
+
+  static int _normalizeMinutesForWindow({
+    required int minutes,
+    required int start,
+    required int end,
+  }) {
+    if (start <= end) {
+      if (minutes < start) {
+        return start;
+      }
+      if (minutes > end) {
+        return end;
+      }
+      return minutes;
+    }
+
+    if (minutes >= start || minutes <= end) {
+      return minutes;
+    }
+
+    final distanceToStart = (start - minutes).abs();
+    final distanceToEnd = (minutes - end).abs();
+    return distanceToStart <= distanceToEnd ? start : end;
   }
 
   static DateTime nextDateTimeForTask({

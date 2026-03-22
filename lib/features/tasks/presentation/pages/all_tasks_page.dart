@@ -309,6 +309,7 @@ String _slotLabel(TaskSlot slot) {
     TaskSlot.morning => 'Morning',
     TaskSlot.afternoon => 'Afternoon',
     TaskSlot.evening => 'Evening',
+    TaskSlot.night => 'Night',
   };
 }
 

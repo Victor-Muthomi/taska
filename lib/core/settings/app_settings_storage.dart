@@ -104,16 +104,21 @@ class AppSettingsStorage {
     final windows = <TaskSlot, SlotWindow>{};
     for (final slot in TaskSlot.values) {
       final rawWindow = json[slot.name];
+      final defaultWindow = SlotSchedule.defaultWindows[slot]!;
       if (rawWindow is! Map<String, dynamic>) {
-        windows[slot] = SlotSchedule.defaultWindows[slot]!;
+        windows[slot] = defaultWindow;
         continue;
       }
 
       windows[slot] = SlotWindow(
-        startHour: (rawWindow['startHour'] as num?)?.toInt() ?? 8,
-        startMinute: (rawWindow['startMinute'] as num?)?.toInt() ?? 0,
-        endHour: (rawWindow['endHour'] as num?)?.toInt() ?? 17,
-        endMinute: (rawWindow['endMinute'] as num?)?.toInt() ?? 0,
+        startHour: (rawWindow['startHour'] as num?)?.toInt() ??
+            defaultWindow.startHour,
+        startMinute: (rawWindow['startMinute'] as num?)?.toInt() ??
+            defaultWindow.startMinute,
+        endHour: (rawWindow['endHour'] as num?)?.toInt() ??
+            defaultWindow.endHour,
+        endMinute: (rawWindow['endMinute'] as num?)?.toInt() ??
+            defaultWindow.endMinute,
       );
     }
 

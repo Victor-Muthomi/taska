@@ -132,6 +132,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
             timeLabel: normalizedTime,
             slot: slot,
             repeat: repeat,
+            status: TaskReminderStatus.pending,
             createdAt: planningAnchor,
             updatedAt: now,
           ),
@@ -153,6 +154,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
               loggedAt: now,
             ),
           );
+      await ref.read(notificationServiceProvider).cancelTaskNotification(taskId);
       await scheduleReminder(updatedTask);
     }
     state = AsyncData(await _refreshTasks());
