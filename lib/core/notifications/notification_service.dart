@@ -13,6 +13,8 @@ import 'notification_payload.dart';
 final FlutterLocalNotificationsPlugin _notificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
+const int _comebackReminderNotificationId = 9000001;
+
 @pragma('vm:entry-point')
 Future<void> notificationTapBackground(NotificationResponse response) async {
   await _handleNotificationResponse(response);
@@ -145,6 +147,53 @@ class NotificationService {
     return _notificationsPlugin.cancel(taskId);
   }
 
+  Future<void> scheduleComebackReminder({required DateTime scheduledAt}) async {
+    await cancelComebackReminder();
+
+    final scheduledTime = tz.TZDateTime.from(scheduledAt, tz.local);
+    if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
+      await _notificationsPlugin.show(
+        _comebackReminderNotificationId,
+        'Come back to Taska',
+        'You have not logged any task activity for 2 days. Pick up where you left off.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'taska_normal_priority',
+            'Smart Reminders',
+            channelDescription: 'Default reminders for scheduled tasks.',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+      return;
+    }
+
+    await _notificationsPlugin.zonedSchedule(
+      _comebackReminderNotificationId,
+      'Come back to Taska',
+      'You have not logged any task activity for 2 days. Pick up where you left off.',
+      scheduledTime,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'taska_normal_priority',
+          'Smart Reminders',
+          channelDescription: 'Default reminders for scheduled tasks.',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      payload: '{"type":"comeback_reminder"}',
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+  }
+
+  Future<void> cancelComebackReminder() {
+    return _notificationsPlugin.cancel(_comebackReminderNotificationId);
+  }
+
   Future<void> _onNotificationResponse(NotificationResponse response) async {
     final payload = response.payload;
     if (payload == null || payload.isEmpty) {
@@ -153,16 +202,6 @@ class NotificationService {
 
     final notificationPayload = NotificationPayload.fromJson(payload);
     final eventType = NotificationLogic.eventTypeForActionId(response.actionId);
-    if (eventType == NotificationEventType.snoozed) {
-      await _scheduleSnoozedNotification(
-        payload: notificationPayload,
-        priority: notificationPayload.priority,
-      );
-      _eventsController.add(
-        NotificationEvent(taskId: notificationPayload.taskId, type: eventType),
-      );
-      return;
-    }
 
     _eventsController.add(
       NotificationEvent(taskId: notificationPayload.taskId, type: eventType),

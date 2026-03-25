@@ -8,6 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taska/core/notifications/notification_channels.dart';
 import 'package:taska/core/notifications/notification_providers.dart';
 import 'package:taska/core/notifications/notification_service.dart';
+import 'package:taska/core/notifications/notification_logic.dart';
+import 'package:taska/core/rewards/models/achievement.dart';
+import 'package:taska/core/rewards/models/user_stats.dart';
+import 'package:taska/core/rewards/repository/reward_repository.dart';
+import 'package:taska/core/rewards/reward_providers.dart';
+import 'package:taska/core/rewards/services/reward_engine.dart';
 import 'package:taska/core/settings/app_settings.dart';
 import 'package:taska/core/settings/app_settings_providers.dart';
 import 'package:taska/core/settings/app_settings_storage.dart';
@@ -61,6 +67,7 @@ void main() {
       overrides: [
         tasksRepositoryProvider.overrideWithValue(repository),
         notificationServiceProvider.overrideWithValue(_FakeNotificationService()),
+        rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
         appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
         initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
       ],
@@ -98,6 +105,7 @@ void main() {
       overrides: [
         tasksRepositoryProvider.overrideWithValue(repository),
         notificationServiceProvider.overrideWithValue(_FakeNotificationService()),
+        rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
         appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
         initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
       ],
@@ -153,6 +161,7 @@ void main() {
       overrides: [
         tasksRepositoryProvider.overrideWithValue(repository),
         notificationServiceProvider.overrideWithValue(_FakeNotificationService()),
+        rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
         appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
         initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
       ],
@@ -197,6 +206,7 @@ void main() {
       overrides: [
         tasksRepositoryProvider.overrideWithValue(repository),
         notificationServiceProvider.overrideWithValue(_FakeNotificationService()),
+        rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
         appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
         initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
       ],
@@ -212,6 +222,61 @@ void main() {
     final updated = repository.tasks.single;
     expect(updated.status, TaskReminderStatus.pending);
     expect(updated.nextReminderAt.isAfter(before), isTrue);
+  });
+
+  test('handleNotificationEvent snoozes and schedules once', () async {
+    final before = DateTime.now();
+    final repository = _FakeTasksRepository(
+      tasks: [
+        Task(
+          id: 1,
+          title: 'Focus block',
+          notes: null,
+          timeLabel: '10:00',
+          slot: TaskSlot.morning,
+          repeat: TaskRepeat.none,
+          status: TaskReminderStatus.pending,
+          createdAt: before,
+          updatedAt: before,
+          nextReminderAt: before,
+          reminderIntervalMinutes: 120,
+          reminderIntensity: TaskReminderIntensity.normal,
+          ignoredCount: 0,
+          completionRate: 0,
+        ),
+      ],
+    );
+    final notificationService = _FakeNotificationService();
+
+    final container = ProviderContainer(
+      overrides: [
+        tasksRepositoryProvider.overrideWithValue(repository),
+        notificationServiceProvider.overrideWithValue(notificationService),
+        rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
+        appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
+        initialAppSettingsProvider.overrideWithValue(AppSettings.defaults()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(tasksControllerProvider.future);
+    notificationService.scheduleCallCount = 0;
+    notificationService.cancelCallCount = 0;
+
+    await container
+        .read(tasksControllerProvider.notifier)
+        .handleNotificationEvent(
+          const NotificationEvent(
+            taskId: 1,
+            type: NotificationEventType.snoozed,
+          ),
+        );
+
+    final updated = repository.tasks.single;
+    expect(updated.status, TaskReminderStatus.snoozed);
+    expect(updated.nextReminderAt.isAfter(before), isTrue);
+    expect(notificationService.scheduleCallCount, 1);
+    expect(notificationService.cancelCallCount, 0);
   });
 }
 
@@ -281,6 +346,9 @@ class _FakeSettingsStorage extends AppSettingsStorage {
 }
 
 class _FakeNotificationService extends NotificationService {
+  int scheduleCallCount = 0;
+  int cancelCallCount = 0;
+
   @override
   Future<void> initialize() async {}
 
@@ -289,8 +357,52 @@ class _FakeNotificationService extends NotificationService {
     required Task task,
     required AppSettings settings,
     ReminderPriority? priority,
-  }) async {}
+  }) async {
+    scheduleCallCount += 1;
+  }
 
   @override
-  Future<void> cancelTaskNotification(int taskId) async {}
+  Future<void> cancelTaskNotification(int taskId) async {
+    cancelCallCount += 1;
+  }
+}
+
+class _FakeRewardEngine extends RewardEngine {
+  _FakeRewardEngine()
+    : super(repository: _FakeRewardRepository());
+
+  @override
+  Future<void> refreshFromLogs({DateTime? today}) async {}
+
+  @override
+  Future<void> evaluateAchievements(TaskLog log) async {}
+
+  @override
+  Future<void> unlockAchievement(String id) async {}
+
+  @override
+  Future<List<Achievement>> getUnlockedAchievements() async => const [];
+
+  @override
+  Future<UserStats> getUserStats() async => UserStats.initial();
+}
+
+class _FakeRewardRepository implements RewardRepository {
+  @override
+  Future<void> saveUserStats(UserStats stats) async {}
+
+  @override
+  Future<List<TaskLog>> getAllTaskLogs() async => const [];
+
+  @override
+  Future<List<TaskLog>> getTaskLogsForTask(int taskId) async => const [];
+
+  @override
+  Future<List<Achievement>> getUnlockedAchievements() async => const [];
+
+  @override
+  Future<void> unlockAchievement(Achievement achievement) async {}
+
+  @override
+  Future<UserStats> getUserStats() async => UserStats.initial();
 }

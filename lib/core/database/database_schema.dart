@@ -3,7 +3,7 @@ import 'package:sqflite/sqflite.dart';
 class DatabaseSchema {
   const DatabaseSchema._();
 
-  static const version = 4;
+  static const version = 5;
 
   static Future<void> onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
@@ -31,6 +31,9 @@ class DatabaseSchema {
     ''');
 
     await _createTaskLogsTable(db);
+    await _createUserStatsTable(db);
+    await _createAchievementsTable(db);
+    await _ensureUserStatsRow(db);
   }
 
   static Future<void> onUpgrade(
@@ -69,6 +72,12 @@ class DatabaseSchema {
     if (oldVersion < 4) {
       await _recreateTaskLogsTableWithForeignKey(db);
     }
+
+    if (oldVersion < 5) {
+      await _createUserStatsTable(db);
+      await _createAchievementsTable(db);
+      await _ensureUserStatsRow(db);
+    }
   }
 
   static Future<void> _createTaskLogsTable(DatabaseExecutor db) async {
@@ -82,6 +91,41 @@ class DatabaseSchema {
         FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  static Future<void> _createUserStatsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS user_stats (
+        id INTEGER PRIMARY KEY,
+        current_streak INTEGER NOT NULL DEFAULT 0,
+        longest_streak INTEGER NOT NULL DEFAULT 0,
+        last_completed_date TEXT
+      )
+    ''');
+  }
+
+  static Future<void> _createAchievementsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS achievements (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        unlocked_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  static Future<void> _ensureUserStatsRow(DatabaseExecutor db) async {
+    await db.insert(
+      'user_stats',
+      {
+        'id': 1,
+        'current_streak': 0,
+        'longest_streak': 0,
+        'last_completed_date': null,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 
   static Future<void> _recreateTaskLogsTableWithForeignKey(Database db) async {

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/analytics/behavior_analytics.dart';
 import '../../../../core/analytics/behavior_analytics_providers.dart';
+import '../../../../core/rewards/models/achievement.dart';
+import '../../../../core/rewards/models/user_stats.dart';
+import '../../../../core/rewards/reward_state_providers.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_providers.dart';
 
@@ -15,12 +18,28 @@ class StatsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksState = ref.watch(tasksControllerProvider);
     final insightState = ref.watch(behaviorInsightProvider);
+    final rewardStatsState = ref.watch(rewardUserStatsProvider);
+    final achievementsState = ref.watch(rewardAchievementsProvider);
 
     final body = tasksState.when(
       data: (tasks) => insightState.when(
-        data: (insight) => _StatsBody(
-          tasks: tasks,
-          insight: insight,
+        data: (insight) => rewardStatsState.when(
+          data: (stats) => achievementsState.when(
+            data: (achievements) => _StatsBody(
+              tasks: tasks,
+              insight: insight,
+              stats: stats,
+              achievements: achievements,
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Center(
+              child: Text('Achievements unavailable: $error'),
+            ),
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(
+            child: Text('Streaks unavailable: $error'),
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Stats unavailable: $error')),
@@ -41,10 +60,17 @@ class StatsPage extends ConsumerWidget {
 }
 
 class _StatsBody extends StatelessWidget {
-  const _StatsBody({required this.tasks, required this.insight});
+  const _StatsBody({
+    required this.tasks,
+    required this.insight,
+    required this.stats,
+    required this.achievements,
+  });
 
   final List<Task> tasks;
   final BehaviorInsight insight;
+  final UserStats stats;
+  final List<Achievement> achievements;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +95,62 @@ class _StatsBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _BehaviorInsights(behaviorInsight: AsyncValue.data(insight)),
+        const SizedBox(height: 20),
+        Text('Reward Progress', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _StatsCard(
+                label: 'Current Streak',
+                value: '${stats.currentStreak}',
+                helper: stats.lastCompletedDate == null
+                    ? 'No completed day yet'
+                    : 'Last completed ${_formatDate(stats.lastCompletedDate!)}',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatsCard(
+                label: 'Longest Streak',
+                value: '${stats.longestStreak}',
+                helper: stats.longestStreak == 0
+                    ? 'Build your first streak'
+                    : 'Best run so far',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Achievements',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                if (achievements.isEmpty)
+                  Text(
+                    'No achievements unlocked yet. Keep completing tasks to earn the first one.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final achievement in achievements)
+                        _AchievementChip(achievement: achievement),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 20),
         Text('Overview', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
@@ -238,6 +320,23 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
+class _AchievementChip extends StatelessWidget {
+  const _AchievementChip({required this.achievement});
+
+  final Achievement achievement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: achievement.description,
+      child: Chip(
+        avatar: const Icon(Icons.emoji_events_outlined, size: 18),
+        label: Text(achievement.title),
+      ),
+    );
+  }
+}
+
 class _StatsCard extends StatelessWidget {
   const _StatsCard({
     required this.label,
@@ -286,4 +385,10 @@ String _formatHour(int hour) {
   final suffix = hour >= 12 ? 'pm' : 'am';
   final normalized = hour % 12 == 0 ? 12 : hour % 12;
   return '$normalized$suffix';
+}
+
+String _formatDate(DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '$day/$month/${date.year}';
 }

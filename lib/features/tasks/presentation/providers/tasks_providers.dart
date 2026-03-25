@@ -6,6 +6,7 @@ import '../../../../core/notifications/notification_logic.dart';
 import '../../../../core/notifications/notification_providers.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/reminders/reminder_engine_providers.dart';
+import '../../../../core/rewards/reward_providers.dart';
 import '../../../../core/scheduling/slot_schedule.dart';
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../data/datasources/tasks_local_data_source.dart';
@@ -170,16 +171,14 @@ class TasksController extends AsyncNotifier<List<Task>> {
     final updatedTask = ref
         .read(reminderEngineProvider)
         .applyCompletion(task, logs);
+    final completionLog = TaskLog(
+      taskId: taskId,
+      action: 'completed',
+      loggedAt: DateTime.now(),
+    );
     await ref.read(tasksRepositoryProvider).updateTask(updatedTask);
-    await ref
-        .read(logTaskActionUseCaseProvider)
-        .call(
-          TaskLog(
-            taskId: taskId,
-            action: 'completed',
-            loggedAt: DateTime.now(),
-          ),
-        );
+    await ref.read(logTaskActionUseCaseProvider).call(completionLog);
+    await ref.read(rewardEngineProvider).refreshFromLogs();
     if (updatedTask.status == TaskReminderStatus.completed) {
       await ref
           .read(notificationServiceProvider)
@@ -211,7 +210,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
           ),
         );
     await scheduleReminder(updatedTask);
-    state = AsyncData(await _refreshTasks());
+    state = AsyncData(await ref.read(getTasksUseCaseProvider).call());
   }
 
   Future<void> unsnoozeTask(Task task) async {
@@ -250,6 +249,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
         );
     await ref.read(deleteTaskUseCaseProvider).call(taskId);
     state = AsyncData(await _refreshTasks());
+    await ref.read(rewardEngineProvider).refreshFromLogs();
   }
 
   Future<void> scheduleReminder(
@@ -276,6 +276,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
               loggedAt: DateTime.now(),
             ),
           );
+      await ref.read(rewardEngineProvider).refreshFromLogs();
     }
   }
 
@@ -295,6 +296,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
             loggedAt: DateTime.now(),
           ),
         );
+    await ref.read(rewardEngineProvider).refreshFromLogs();
   }
 
   Future<void> handleNotificationEvent(NotificationEvent event) async {
@@ -318,10 +320,11 @@ class TasksController extends AsyncNotifier<List<Task>> {
                 loggedAt: DateTime.now(),
               ),
             );
+        await ref.read(rewardEngineProvider).refreshFromLogs();
         break;
       case NotificationEventType.snoozed:
         await snoozeTask(task);
-        break;
+        return;
     }
 
     state = AsyncData(await _refreshTasks());

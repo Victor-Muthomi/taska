@@ -3,9 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:taska/app/app.dart';
+import 'package:taska/core/analytics/behavior_analytics.dart';
+import 'package:taska/core/analytics/behavior_analytics_providers.dart';
 import 'package:taska/core/notifications/notification_channels.dart';
 import 'package:taska/core/notifications/notification_providers.dart';
 import 'package:taska/core/notifications/notification_service.dart';
+import 'package:taska/core/rewards/models/achievement.dart';
+import 'package:taska/core/rewards/models/user_stats.dart';
+import 'package:taska/core/rewards/repository/reward_repository.dart';
+import 'package:taska/core/rewards/reward_providers.dart';
+import 'package:taska/core/rewards/reward_state_providers.dart';
+import 'package:taska/core/rewards/services/reward_engine.dart';
 import 'package:taska/core/settings/app_settings.dart';
 import 'package:taska/core/settings/app_settings_providers.dart';
 import 'package:taska/core/settings/app_settings_storage.dart';
@@ -25,6 +33,26 @@ void main() {
           notificationServiceProvider.overrideWithValue(
             _FakeNotificationService(),
           ),
+          rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
+          rewardUserStatsProvider.overrideWith((ref) async {
+            return UserStats(
+              id: 1,
+              currentStreak: 3,
+              longestStreak: 5,
+              lastCompletedDate: DateTime(2026, 3, 20),
+            );
+          }),
+          rewardAchievementsProvider.overrideWith((ref) async {
+            return [
+              Achievement(
+                id: 'consistency_starter',
+                title: 'Consistency Starter',
+                description:
+                    'Complete at least one task for 3 consecutive days.',
+                unlockedAt: DateTime(2026, 3, 20),
+              ),
+            ];
+          }),
         ],
         child: const MyApp(),
       ),
@@ -50,6 +78,26 @@ void main() {
           notificationServiceProvider.overrideWithValue(
             _FakeNotificationService(),
           ),
+          rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
+          rewardUserStatsProvider.overrideWith((ref) async {
+            return UserStats(
+              id: 1,
+              currentStreak: 3,
+              longestStreak: 5,
+              lastCompletedDate: DateTime(2026, 3, 20),
+            );
+          }),
+          rewardAchievementsProvider.overrideWith((ref) async {
+            return [
+              Achievement(
+                id: 'consistency_starter',
+                title: 'Consistency Starter',
+                description:
+                    'Complete at least one task for 3 consecutive days.',
+                unlockedAt: DateTime(2026, 3, 20),
+              ),
+            ];
+          }),
         ],
         child: const MyApp(),
       ),
@@ -88,6 +136,26 @@ void main() {
           notificationServiceProvider.overrideWithValue(
             _FakeNotificationService(),
           ),
+          rewardEngineProvider.overrideWithValue(_FakeRewardEngine()),
+          rewardUserStatsProvider.overrideWith((ref) async {
+            return UserStats(
+              id: 1,
+              currentStreak: 3,
+              longestStreak: 5,
+              lastCompletedDate: DateTime(2026, 3, 20),
+            );
+          }),
+          rewardAchievementsProvider.overrideWith((ref) async {
+            return [
+              Achievement(
+                id: 'consistency_starter',
+                title: 'Consistency Starter',
+                description:
+                    'Complete at least one task for 3 consecutive days.',
+                unlockedAt: DateTime(2026, 3, 20),
+              ),
+            ];
+          }),
         ],
         child: MaterialApp(
           home: Scaffold(
@@ -150,15 +218,47 @@ void main() {
           notificationServiceProvider.overrideWithValue(
             _FakeNotificationService(),
           ),
+          behaviorInsightProvider.overrideWith((ref) async {
+            return const BehaviorInsight(
+              completionRate: 1,
+              mostActiveHour: 20,
+              mostActiveSlot: TaskSlot.evening,
+              suggestedSlot: null,
+              overloadWarning: null,
+              suggestion: 'You are on a great rhythm.',
+            );
+          }),
+          rewardUserStatsProvider.overrideWith((ref) async {
+            return UserStats(
+              id: 1,
+              currentStreak: 3,
+              longestStreak: 5,
+              lastCompletedDate: DateTime(2026, 3, 20),
+            );
+          }),
+          rewardAchievementsProvider.overrideWith((ref) async {
+            return [
+              Achievement(
+                id: 'consistency_starter',
+                title: 'Consistency Starter',
+                description:
+                    'Complete at least one task for 3 consecutive days.',
+                unlockedAt: DateTime(2026, 3, 20),
+              ),
+            ];
+          }),
         ],
         child: const MyApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Stats').last);
+    await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    expect(find.text('Overview'), findsOneWidget);
+
+    expect(find.text('View streaks and achievements'), findsOneWidget);
+    await tester.tapAt(const Offset(500, 20));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
@@ -258,6 +358,46 @@ class _FakeNotificationService extends NotificationService {
 
   @override
   Future<void> cancelTaskNotification(int taskId) async {}
+}
+
+class _FakeRewardEngine extends RewardEngine {
+  _FakeRewardEngine()
+    : super(repository: _FakeRewardRepository());
+
+  @override
+  Future<void> refreshFromLogs({DateTime? today}) async {}
+
+  @override
+  Future<void> evaluateAchievements(TaskLog log) async {}
+
+  @override
+  Future<void> unlockAchievement(String id) async {}
+
+  @override
+  Future<List<Achievement>> getUnlockedAchievements() async => const [];
+
+  @override
+  Future<UserStats> getUserStats() async => UserStats.initial();
+}
+
+class _FakeRewardRepository implements RewardRepository {
+  @override
+  Future<UserStats> getUserStats() async => UserStats.initial();
+
+  @override
+  Future<void> saveUserStats(UserStats stats) async {}
+
+  @override
+  Future<List<TaskLog>> getAllTaskLogs() async => const [];
+
+  @override
+  Future<List<TaskLog>> getTaskLogsForTask(int taskId) async => const [];
+
+  @override
+  Future<List<Achievement>> getUnlockedAchievements() async => const [];
+
+  @override
+  Future<void> unlockAchievement(Achievement achievement) async {}
 }
 
 Task _demoTask({

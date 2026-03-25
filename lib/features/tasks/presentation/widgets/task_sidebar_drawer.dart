@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
 import '../../domain/entities/task.dart';
+import '../pages/stats_page.dart';
 import '../pages/task_calendar_page.dart';
 import '../pages/tasks_page.dart';
 import '../providers/tasks_providers.dart';
@@ -64,6 +65,13 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
                 'Calendar and data tools in one place.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.query_stats_outlined),
+                title: const Text('Stats'),
+                subtitle: const Text('View streaks and achievements'),
+                onTap: () => _openStats(context),
+              ),
               const SizedBox(height: 16),
               _DataToolsCard(
                 onExport: () => exportTasksJson(
@@ -106,6 +114,13 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
     Navigator.of(context).pop();
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const TaskCalendarPage()),
+    );
+  }
+
+  void _openStats(BuildContext context) {
+    Navigator.of(context).pop();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const StatsPage()),
     );
   }
 }
