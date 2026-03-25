@@ -1,8 +1,8 @@
 # Taska
 
-Taska is an offline-first Flutter app for flexible, slot-based task reminders.
+Taska is an offline-first Flutter app for flexible, slot-based task reminders with rewards, stats, and achievements.
 
-It is designed around a simple idea: most tasks do not belong to one fragile alarm time. They belong to a window of the day. Taska helps you plan around the real flow of your schedule by organizing tasks into morning, afternoon, and evening slots, then adapting reminders based on what you complete, snooze, or ignore.
+It is designed around a simple idea: most tasks do not belong to one fragile alarm time. They belong to a window of the day. Taska helps you plan around the real flow of your schedule by organizing tasks into morning, afternoon, evening, and night slots, then adapting reminders based on what you complete, snooze, or ignore.
 
 ## Why Taska Exists
 
@@ -14,17 +14,20 @@ Taska focuses on:
 - Local, private storage instead of a cloud-first workflow
 - Behavior-aware scheduling that learns from completion and snooze patterns
 - Lightweight planning tools that stay simple enough to use every day
+- Progress feedback through rewards, user stats, and achievements
 
 The result is a task manager that feels practical for real routines: flexible, private, and dependable even when your day shifts around.
 
 ## What It Does
 
-- Organizes tasks into clear time windows: morning, afternoon, and evening
+- Organizes tasks into clear time windows: morning, afternoon, evening, and night
+- Supports a night slot for late-day tasks and reminders
 - Stores task data locally with SQLite
 - Schedules local notifications for reminder delivery
 - Supports snooze and unsnooze flows, including date selection in the task form
 - Adapts reminder timing and intensity based on user behavior
 - Tracks lightweight analytics such as completion rate and most active time
+- Tracks user stats, streaks, and unlocked achievements
 - Supports dark mode, JSON export/import, backup restore, and local settings persistence
 
 ## Core Experience
@@ -34,10 +37,12 @@ Taska is built to stay out of your way while still keeping your schedule visible
 You can:
 
 - Add a task to the part of the day where it actually belongs
+- Put late tasks into a dedicated night slot instead of forcing them into evening
 - Let the app remind you locally without needing a server account
 - Snooze tasks when the timing is off, then bring them back when it makes sense
 - Export your data for backup or move it between devices
 - Review basic trends to understand when you are most consistent
+- See reward progress and achievements as you complete tasks
 
 This makes Taska useful for people who want reminders that adapt to life instead of fighting it.
 
@@ -63,6 +68,8 @@ The repository also includes release support documents under [`docs/`](docs/):
 - [`docs/release_notes.md`](docs/release_notes.md)
 - [`docs/play_store_metadata.md`](docs/play_store_metadata.md)
 - [`docs/release_checklist.md`](docs/release_checklist.md)
+
+The latest release is 3.0, which adds night-slot scheduling and a rewards system with user stats and achievements.
 
 ## Getting Started
 
@@ -110,7 +117,7 @@ These permissions are configured in [`android/app/src/main/AndroidManifest.xml`]
 
 ## Current Status
 
-Taska is feature-complete for MVP and has passing static analysis and automated tests.
+Taska is feature-complete for the current 3.0 release and has passing static analysis and automated tests.
 
 The main work still pending before a public release is real-device validation of notification behavior across Android scenarios.
 

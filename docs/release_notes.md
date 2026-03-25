@@ -1,5 +1,38 @@
 # Taska Release Notes
 
+## Version 3.0
+
+Release date: 2026-03-25
+
+Taska 3.0 expands the app beyond flexible reminders into a more complete daily task system. Compared with 2.7, it adds a night slot to the scheduling model and a rewards layer with user stats and achievements.
+
+### Highlights
+
+- Night slot scheduling alongside morning, afternoon, and evening
+- Rewards system with user stats, streaks, and achievements
+- Stats page updates to surface progress and unlocked achievements
+- Reminder and settings updates to support the expanded slot schedule
+- Expanded test coverage for rewards, scheduling, and task flow integration
+
+### Recent Improvements
+
+- Added night slot support to task scheduling and related UI flows
+- Added a rewards engine and persistence for user stats and achievements
+- Updated the stats view to show achievement progress and unlocks
+- Refreshed task completion and deletion flows to keep reward data in sync
+- Added tests for reward logic, database schema, and task provider behavior
+
+### Validation
+
+- Static analysis passes
+- Automated tests pass
+- Android release readiness still depends on real-device notification and alarm validation
+
+### Notes
+
+- Taska stores user data locally on device and does not require an account for core usage.
+- Some Android release packaging details, such as final signing and store listing copy, are still tracked in the release checklist.
+
 ## Version 2.7
 
 Release date: 2026-03-21
