@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../tasks/domain/entities/task.dart';
 import '../providers/shopping_providers.dart';
+import 'shopping_item_completion_chip.dart';
 
 class ShoppingTaskItemsPreview extends ConsumerWidget {
   const ShoppingTaskItemsPreview({
@@ -45,15 +46,7 @@ class ShoppingTaskItemsPreview extends ConsumerWidget {
                 runSpacing: 8,
                 children: [
                   for (final item in linkedItems)
-                    Chip(
-                      avatar: Icon(
-                        item.isCompleted
-                            ? Icons.check_circle_outline
-                            : Icons.radio_button_unchecked,
-                        size: 18,
-                      ),
-                      label: Text(item.name),
-                    ),
+                    ShoppingItemCompletionChip(item: item),
                 ],
               ),
             ],

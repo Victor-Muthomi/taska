@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/shopping_item.dart';
 import '../providers/shopping_providers.dart';
+import 'shopping_item_completion_chip.dart';
 
 class ShoppingTaskItemsEditor extends ConsumerStatefulWidget {
   const ShoppingTaskItemsEditor({
@@ -23,10 +24,12 @@ class ShoppingTaskItemsEditor extends ConsumerStatefulWidget {
   final bool enabled;
 
   @override
-  ConsumerState<ShoppingTaskItemsEditor> createState() => _ShoppingTaskItemsEditorState();
+  ConsumerState<ShoppingTaskItemsEditor> createState() =>
+      _ShoppingTaskItemsEditorState();
 }
 
-class _ShoppingTaskItemsEditorState extends ConsumerState<ShoppingTaskItemsEditor> {
+class _ShoppingTaskItemsEditorState
+    extends ConsumerState<ShoppingTaskItemsEditor> {
   final TextEditingController _controller = TextEditingController();
   bool _isSubmitting = false;
 
@@ -138,25 +141,14 @@ class _ShoppingTaskItemsEditorState extends ConsumerState<ShoppingTaskItemsEdito
             ],
             if (linkedItems.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(
-                'Linked now',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
+              Text('Linked now', style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   for (final item in linkedItems)
-                    Chip(
-                      avatar: Icon(
-                        item.isCompleted
-                            ? Icons.check_circle_outline
-                            : Icons.radio_button_unchecked,
-                        size: 18,
-                      ),
-                      label: Text(item.name),
-                    ),
+                    ShoppingItemCompletionChip(item: item),
                 ],
               ),
             ],
