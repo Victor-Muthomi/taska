@@ -9,7 +9,9 @@ import '../widgets/add_item_input.dart';
 import '../widgets/suggested_items_widget.dart';
 
 class ShoppingListScreen extends ConsumerStatefulWidget {
-  const ShoppingListScreen({super.key});
+  const ShoppingListScreen({super.key, this.initialSessionId});
+
+  final String? initialSessionId;
 
   @override
   ConsumerState<ShoppingListScreen> createState() => _ShoppingListScreenState();
@@ -25,12 +27,12 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _bootstrapCurrentSession();
+        _bootstrapCurrentSession(preferredSessionId: widget.initialSessionId);
       }
     });
   }
 
-  Future<void> _bootstrapCurrentSession() async {
+  Future<void> _bootstrapCurrentSession({String? preferredSessionId}) async {
     try {
       final repository = ref.read(shoppingRepositoryProvider);
       final controller = ref.read(shoppingItemsControllerProvider.notifier);
@@ -39,11 +41,22 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
       ShoppingSession? selectedSession;
 
-      for (final session in sessions) {
-        if (DateUtils.dateOnly(session.date) == today &&
-            session.status == ShoppingSessionStatus.active) {
-          selectedSession = session;
-          break;
+      if (preferredSessionId != null) {
+        for (final session in sessions) {
+          if (session.id == preferredSessionId) {
+            selectedSession = session;
+            break;
+          }
+        }
+      }
+
+      if (selectedSession == null) {
+        for (final session in sessions) {
+          if (DateUtils.dateOnly(session.date) == today &&
+              session.status == ShoppingSessionStatus.active) {
+            selectedSession = session;
+            break;
+          }
         }
       }
 
@@ -59,10 +72,13 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       selectedSession ??= sessions.isNotEmpty ? sessions.first : null;
 
       if (selectedSession == null) {
-        selectedSession = await controller.createSession(today, 'Shopping List');
-      } else {
-        await controller.loadSession(selectedSession.id);
+        selectedSession = await controller.createSession(
+          today,
+          'Shopping List',
+        );
       }
+
+      await controller.loadSession(selectedSession.id);
 
       if (!mounted) {
         return;
@@ -85,6 +101,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     }
   }
 
+  Future<void> _switchSession(String sessionId) async {
+    setState(() {
+      _isBootstrapping = true;
+      _bootstrapError = null;
+    });
+    await _bootstrapCurrentSession(preferredSessionId: sessionId);
+  }
+
   ShoppingSession? _currentSession(ShoppingItemsController controller) {
     try {
       return controller.session;
@@ -96,20 +120,21 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(shoppingItemsControllerProvider);
+    final sessionsState = ref.watch(shoppingSessionsProvider);
     final suggestionsState = ref.watch(shoppingSuggestionsProvider);
     final controller = ref.read(shoppingItemsControllerProvider.notifier);
     final session = _currentSession(controller);
 
     if (_isBootstrapping) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Shopping List')),
+        appBar: AppBar(title: const Text('Shopping Lists')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_bootstrapError != null && session == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Shopping List')),
+        appBar: AppBar(title: const Text('Shopping Lists')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -119,7 +144,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 Text('Shopping unavailable: $_bootstrapError'),
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed: _bootstrapCurrentSession,
+                  onPressed: () => _bootstrapCurrentSession(
+                    preferredSessionId: widget.initialSessionId,
+                  ),
                   child: const Text('Retry'),
                 ),
               ],
@@ -131,7 +158,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
     if (session == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Shopping List')),
+        appBar: AppBar(title: const Text('Shopping Lists')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -140,17 +167,28 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final categories = _sortedCategories(items);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Shopping List')),
+      appBar: AppBar(title: const Text('Shopping Lists')),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(shoppingItemsControllerProvider);
             ref.invalidate(shoppingSuggestionsProvider);
-            await _bootstrapCurrentSession();
+            ref.invalidate(shoppingSessionsProvider);
+            await _bootstrapCurrentSession(preferredSessionId: session.id);
           },
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              sessionsState.when(
+                data: (sessions) => _SessionSwitcherCard(
+                  sessions: sessions,
+                  activeSessionId: session.id,
+                  onSelected: _switchSession,
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+              const SizedBox(height: 16),
               Text(
                 session.title,
                 style: Theme.of(context).textTheme.headlineSmall,
@@ -175,23 +213,26 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   }
 
                   await controller.updateSession(
-                    session.copyWith(
-                      date: DateUtils.dateOnly(pickedDate),
-                    ),
+                    session.copyWith(date: DateUtils.dateOnly(pickedDate)),
                   );
                 },
                 onClone: () async {
-                  await controller.cloneSession(session.id);
-                  if (mounted) {
-                    setState(() {});
+                  final cloned = await controller.cloneSession(session.id);
+                  if (!mounted) {
+                    return;
                   }
+                  await _switchSession(cloned.id);
                 },
               ),
               const SizedBox(height: 16),
               AddItemInput(
                 categoryOptions: categories,
                 onAdd: (name, category) {
-                  return controller.addItem(name: name, category: category);
+                  return controller.addItem(
+                    name: name,
+                    category: category,
+                    sessionId: session.id,
+                  );
                 },
               ),
               const SizedBox(height: 12),
@@ -199,7 +240,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 data: (suggestions) => SuggestedItemsWidget(
                   suggestions: suggestions,
                   onSuggestionSelected: (item) {
-                    controller.addSuggestedItem(item);
+                    controller.addSuggestedItem(item, sessionId: session.id);
                   },
                 ),
                 loading: () => const SizedBox.shrink(),
@@ -226,7 +267,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   }
 
   List<String> _sortedCategories(List<ShoppingItem> items) {
-    final categories = items.map((item) => _categoryLabel(item.category)).toSet().toList();
+    final categories = items
+        .map((item) => _categoryLabel(item.category))
+        .toSet()
+        .toList();
     categories.sort((a, b) {
       if (a == 'General') {
         return -1;
@@ -254,6 +298,55 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   }
 }
 
+class _SessionSwitcherCard extends StatelessWidget {
+  const _SessionSwitcherCard({
+    required this.sessions,
+    required this.activeSessionId,
+    required this.onSelected,
+  });
+
+  final List<ShoppingSession> sessions;
+  final String activeSessionId;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sessions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Available lists',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final session in sessions)
+                  ChoiceChip(
+                    selected: session.id == activeSessionId,
+                    label: Text(session.title),
+                    onSelected: session.id == activeSessionId
+                        ? null
+                        : (_) => onSelected(session.id),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SessionHeader extends StatelessWidget {
   const _SessionHeader({
     required this.session,
@@ -268,6 +361,10 @@ class _SessionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final statusLabel = switch (session.status) {
+      ShoppingSessionStatus.active => 'Active',
+      ShoppingSessionStatus.completed => 'Completed',
+    };
 
     return Card(
       child: Padding(
@@ -285,7 +382,7 @@ class _SessionHeader extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Chip(
-                  label: const Text('Active'),
+                  label: Text(statusLabel),
                   backgroundColor: colorScheme.primaryContainer,
                 ),
               ],
@@ -321,10 +418,7 @@ class _SessionHeader extends StatelessWidget {
 }
 
 class _CategorySection extends StatelessWidget {
-  const _CategorySection({
-    required this.category,
-    required this.items,
-  });
+  const _CategorySection({required this.category, required this.items});
 
   final String category;
   final List<ShoppingItem> items;
@@ -340,10 +434,7 @@ class _CategorySection extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  category,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(category, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(width: 8),
                 Text(
                   '${items.length}',
@@ -388,7 +479,9 @@ class _ShoppingItemTile extends ConsumerWidget {
         ),
       ),
       onDismissed: (_) async {
-        await ref.read(shoppingItemsControllerProvider.notifier).deleteItem(item.id);
+        await ref
+            .read(shoppingItemsControllerProvider.notifier)
+            .deleteItem(item.id);
       },
       child: CheckboxListTile(
         contentPadding: EdgeInsets.zero,
@@ -402,10 +495,7 @@ class _ShoppingItemTile extends ConsumerWidget {
         },
         title: Text(item.name, style: titleStyle),
         subtitle: item.linkedTaskId == null
-            ? Text(
-                item.category,
-                style: Theme.of(context).textTheme.bodySmall,
-              )
+            ? Text(item.category, style: Theme.of(context).textTheme.bodySmall)
             : Text(
                 'Linked to task ${item.linkedTaskId}',
                 style: Theme.of(context).textTheme.bodySmall,

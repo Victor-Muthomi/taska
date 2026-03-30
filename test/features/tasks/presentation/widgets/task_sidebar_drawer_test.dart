@@ -6,16 +6,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:taska/app/app.dart';
+import 'package:taska/core/reminders/reminder_engine.dart';
+import 'package:taska/core/shopping/shopping_event_logger.dart';
+import 'package:taska/core/shopping/shopping_service.dart';
+import 'package:taska/core/shopping/shopping_service_providers.dart';
 import 'package:taska/core/notifications/notification_channels.dart';
 import 'package:taska/core/notifications/notification_providers.dart';
 import 'package:taska/core/notifications/notification_service.dart';
 import 'package:taska/core/settings/app_settings.dart';
 import 'package:taska/core/settings/app_settings_providers.dart';
 import 'package:taska/core/settings/app_settings_storage.dart';
+import 'package:taska/features/shopping/domain/entities/shopping_item.dart';
+import 'package:taska/features/shopping/domain/entities/shopping_session.dart';
+import 'package:taska/features/shopping/domain/repositories/shopping_repository.dart';
 import 'package:taska/features/tasks/domain/entities/task.dart';
 import 'package:taska/features/tasks/domain/entities/task_log.dart';
 import 'package:taska/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:taska/features/tasks/presentation/providers/tasks_providers.dart';
+import 'package:taska/features/tasks/presentation/widgets/task_sidebar_drawer.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -35,24 +43,84 @@ void main() {
         });
   });
 
-  testWidgets('sidebar opens calendar screen and data actions remain available', (
+  testWidgets(
+    'sidebar opens calendar screen and data actions remain available',
+    (tester) async {
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day, 23);
+      final tomorrowDate = todayDate.add(const Duration(days: 1));
+      final shoppingRepository = _FakeShoppingRepository();
+
+      final repository = _FakeTasksRepository(
+        tasks: [
+          _task(id: 1, title: 'Today task', nextReminderAt: todayDate),
+          _task(id: 2, title: 'Tomorrow task', nextReminderAt: tomorrowDate),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tasksControllerProvider.overrideWith(
+              () => _FakeTasksController(repository.tasks),
+            ),
+            tasksRepositoryProvider.overrideWithValue(repository),
+            shoppingRepositoryProvider.overrideWithValue(shoppingRepository),
+            shoppingServiceProvider.overrideWithValue(
+              ShoppingService(
+                shoppingRepository: shoppingRepository,
+                tasksRepository: repository,
+                eventLogger: _FakeShoppingEventLogger(),
+                reminderEngine: ReminderEngine(
+                  settings: AppSettings.defaults(),
+                ),
+              ),
+            ),
+            appSettingsStorageProvider.overrideWithValue(
+              _FakeSettingsStorage(),
+            ),
+            notificationServiceProvider.overrideWithValue(
+              _FakeNotificationService(),
+            ),
+          ],
+          child: const MyApp(),
+        ),
+      );
+      await _pumpUntilText(tester, 'Sidebar');
+
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Sidebar'), findsOneWidget);
+      expect(find.text('Export JSON'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.byTooltip('Open calendar'),
+        48,
+        scrollable: find.byType(Scrollable).last,
+      );
+    },
+  );
+
+  testWidgets('sidebar shows shopping lists from stored sessions', (
     tester,
   ) async {
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day, 23);
-    final tomorrowDate = todayDate.add(const Duration(days: 1));
-
-    final repository = _FakeTasksRepository(
-      tasks: [
-        _task(
-          id: 1,
-          title: 'Today task',
-          nextReminderAt: todayDate,
+    final tasksRepository = _FakeTasksRepository();
+    final shoppingRepository = _FakeShoppingRepository(
+      sessions: [
+        ShoppingSession(
+          id: 'session-1',
+          date: DateTime(2026, 3, 30),
+          title: 'Weekend groceries',
+          status: ShoppingSessionStatus.active,
+          createdAt: DateTime(2026, 3, 30, 8),
         ),
-        _task(
-          id: 2,
-          title: 'Tomorrow task',
-          nextReminderAt: tomorrowDate,
+        ShoppingSession(
+          id: 'session-2',
+          date: DateTime(2026, 3, 28),
+          title: 'Party supplies',
+          status: ShoppingSessionStatus.completed,
+          createdAt: DateTime(2026, 3, 28, 8),
         ),
       ],
     );
@@ -61,30 +129,40 @@ void main() {
       ProviderScope(
         overrides: [
           tasksControllerProvider.overrideWith(
-            () => _FakeTasksController(repository.tasks),
+            () => _FakeTasksController(tasksRepository.tasks),
           ),
-          tasksRepositoryProvider.overrideWithValue(repository),
+          tasksRepositoryProvider.overrideWithValue(tasksRepository),
+          shoppingRepositoryProvider.overrideWithValue(shoppingRepository),
+          shoppingServiceProvider.overrideWithValue(
+            ShoppingService(
+              shoppingRepository: shoppingRepository,
+              tasksRepository: tasksRepository,
+              eventLogger: _FakeShoppingEventLogger(),
+              reminderEngine: ReminderEngine(settings: AppSettings.defaults()),
+            ),
+          ),
           appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
           notificationServiceProvider.overrideWithValue(
             _FakeNotificationService(),
           ),
         ],
-        child: const MyApp(),
+        child: MaterialApp(
+          home: Scaffold(
+            appBar: AppBar(),
+            body: const Text('Home'),
+            drawer: const TaskSidebarDrawer(),
+          ),
+        ),
       ),
     );
-    await _pumpUntilText(tester, 'Sidebar');
 
     await tester.tap(find.byTooltip('Open navigation menu'));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Sidebar'), findsOneWidget);
-    expect(find.text('Export JSON'), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.byTooltip('Open calendar'),
-      48,
-      scrollable: find.byType(Scrollable).last,
-    );
+    expect(find.text('Shopping lists'), findsOneWidget);
+    expect(find.text('Weekend groceries'), findsOneWidget);
+    expect(find.text('Party supplies'), findsOneWidget);
+    expect(find.text('New'), findsOneWidget);
   });
 }
 
@@ -98,9 +176,12 @@ Future<void> _pumpUntilText(WidgetTester tester, String text) async {
 }
 
 class _FakeTasksRepository implements TasksRepository {
-  _FakeTasksRepository({List<Task>? tasks, List<Task>? taskList, List<TaskLog>? logs})
-    : tasks = tasks ?? taskList ?? [],
-      logs = logs ?? [];
+  _FakeTasksRepository({
+    List<Task>? tasks,
+    List<Task>? taskList,
+    List<TaskLog>? logs,
+  }) : tasks = tasks ?? taskList ?? [],
+       logs = logs ?? [];
 
   final List<Task> tasks;
   final List<TaskLog> logs;
@@ -175,6 +256,124 @@ class _FakeNotificationService extends NotificationService {
 
   @override
   Future<void> cancelTaskNotification(int taskId) async {}
+}
+
+class _FakeShoppingEventLogger implements ShoppingEventLogger {
+  @override
+  Future<void> logItemAdded(ShoppingItem item) async {}
+
+  @override
+  Future<void> logItemCompleted(ShoppingItem item) async {}
+
+  @override
+  Future<void> logItemUpdated(ShoppingItem item) async {}
+
+  @override
+  Future<void> logSessionCreated(ShoppingSession session) async {}
+}
+
+class _FakeShoppingRepository implements ShoppingRepository {
+  _FakeShoppingRepository({
+    List<ShoppingSession>? sessions,
+    List<ShoppingItem>? items,
+  }) : sessions = {
+         for (final session in sessions ?? <ShoppingSession>[])
+           session.id: session,
+       },
+       items = List<ShoppingItem>.from(items ?? const []);
+
+  final Map<String, ShoppingSession> sessions;
+  final List<ShoppingItem> items;
+
+  @override
+  Future<ShoppingItem> addItem(ShoppingItem item) async {
+    items.add(item);
+    return item;
+  }
+
+  @override
+  Future<ShoppingSession> createSession(DateTime date, String title) async {
+    final session = ShoppingSession(
+      id: 'session-${sessions.length + 1}',
+      date: date,
+      title: title,
+      status: ShoppingSessionStatus.active,
+      createdAt: DateTime(2026, 3, 30, 8),
+    );
+    sessions[session.id] = session;
+    return session;
+  }
+
+  @override
+  Future<void> deleteItem(String itemId) async {
+    items.removeWhere((item) => item.id == itemId);
+  }
+
+  @override
+  Future<void> deleteSession(String id) async {
+    sessions.remove(id);
+  }
+
+  @override
+  Future<ShoppingItem?> getItemById(String id) async {
+    for (final item in items) {
+      if (item.id == id) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<ShoppingItem>> getItems() async => List<ShoppingItem>.from(items);
+
+  @override
+  Future<List<ShoppingItem>> getItemsBySession(String sessionId) async {
+    return items.where((item) => item.sessionId == sessionId).toList();
+  }
+
+  @override
+  Future<List<ShoppingItem>> getItemsByTask(String taskId) async {
+    return items.where((item) => item.linkedTaskId == taskId).toList();
+  }
+
+  @override
+  Future<ShoppingSession?> getSessionById(String id) async => sessions[id];
+
+  @override
+  Future<List<ShoppingSession>> getSessions() async {
+    final values = sessions.values.toList()
+      ..sort((left, right) => right.date.compareTo(left.date));
+    return values;
+  }
+
+  @override
+  Future<ShoppingItem> updateItem(ShoppingItem item) async {
+    final index = items.indexWhere((candidate) => candidate.id == item.id);
+    if (index == -1) {
+      items.add(item);
+    } else {
+      items[index] = item;
+    }
+    return item;
+  }
+
+  @override
+  Future<void> updateItemStatus({
+    required String itemId,
+    required bool isCompleted,
+  }) async {
+    final index = items.indexWhere((item) => item.id == itemId);
+    if (index == -1) {
+      return;
+    }
+    items[index] = items[index].copyWith(isCompleted: isCompleted);
+  }
+
+  @override
+  Future<void> updateSession(ShoppingSession session) async {
+    sessions[session.id] = session;
+  }
 }
 
 class _FakeTasksController extends TasksController {

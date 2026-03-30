@@ -12,14 +12,16 @@ final shoppingItemsControllerProvider =
       ShoppingItemsController.new,
     );
 
+final shoppingSessionsProvider = FutureProvider<List<ShoppingSession>>((ref) {
+  return ref.watch(shoppingRepositoryProvider).getSessions();
+});
+
 final shoppingSuggestionsProvider = FutureProvider<List<ShoppingItem>>((ref) {
   return ref.watch(shoppingServiceProvider).suggestItems();
 });
 
 class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
-    implements
-        ActiveShoppingSessionContract,
-        ShoppingSessionCloneAction {
+    implements ActiveShoppingSessionContract, ShoppingSessionCloneAction {
   ShoppingSession? _session;
   List<ShoppingItem> _sessionItems = const [];
 
@@ -56,6 +58,7 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
     required String name,
     String category = 'General',
     String? linkedTaskId,
+    String? sessionId,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -71,6 +74,7 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
             category: category.trim().isEmpty ? 'General' : category.trim(),
             isCompleted: false,
             linkedTaskId: linkedTaskId,
+            sessionId: sessionId,
             createdAt: DateTime.now(),
           ),
         );
@@ -78,11 +82,15 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
     await _refresh();
   }
 
-  Future<void> addSuggestedItem(ShoppingItem suggestion) async {
+  Future<void> addSuggestedItem(
+    ShoppingItem suggestion, {
+    String? sessionId,
+  }) async {
     await addItem(
       name: suggestion.name,
       category: suggestion.category,
       linkedTaskId: suggestion.linkedTaskId,
+      sessionId: sessionId,
     );
   }
 
@@ -163,6 +171,7 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
 
   Future<void> _refresh() async {
     ref.invalidate(shoppingSuggestionsProvider);
+    ref.invalidate(shoppingSessionsProvider);
     state = AsyncData(await _loadItems());
     await _refreshLoadedSession();
   }
