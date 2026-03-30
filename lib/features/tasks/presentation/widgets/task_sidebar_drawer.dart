@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
+import '../../../shopping/presentation/pages/shopping_list_screen.dart';
 import '../../domain/entities/task.dart';
 import '../pages/stats_page.dart';
 import '../pages/task_calendar_page.dart';
@@ -72,6 +73,12 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
                 subtitle: const Text('View streaks and achievements'),
                 onTap: () => _openStats(context),
               ),
+              ListTile(
+                leading: const Icon(Icons.shopping_cart_outlined),
+                title: const Text('Shopping list'),
+                subtitle: const Text('Quick add and smart suggestions'),
+                onTap: () => _openShoppingList(context),
+              ),
               const SizedBox(height: 16),
               _DataToolsCard(
                 onExport: () => exportTasksJson(
@@ -121,6 +128,13 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
     Navigator.of(context).pop();
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const StatsPage()),
+    );
+  }
+
+  void _openShoppingList(BuildContext context) {
+    Navigator.of(context).pop();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ShoppingListScreen()),
     );
   }
 }

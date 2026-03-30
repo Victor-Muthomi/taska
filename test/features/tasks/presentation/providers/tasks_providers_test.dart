@@ -83,6 +83,7 @@ void main() {
           title: 'Updated review',
           notes: 'fresh notes',
           timeLabel: '09:30',
+          type: TaskType.normal,
           slot: TaskSlot.afternoon,
           repeat: TaskRepeat.daily,
         );
@@ -100,6 +101,8 @@ void main() {
 
   test('addTask keeps the created task on the selected calendar day', () async {
     final repository = _FakeTasksRepository();
+    final now = DateTime.now();
+    final scheduledFor = DateTime(now.year, now.month, now.day + 1);
 
     final container = ProviderContainer(
       overrides: [
@@ -113,15 +116,14 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(tasksControllerProvider.future);
-
-    final scheduledFor = DateTime(2026, 3, 24);
     await container
         .read(tasksControllerProvider.notifier)
         .addTask(
           title: 'Calendar task',
           notes: 'from calendar',
-          timeLabel: '09:00',
-          slot: TaskSlot.morning,
+          timeLabel: '23:00',
+          type: TaskType.normal,
+          slot: TaskSlot.evening,
           repeat: TaskRepeat.none,
           scheduledFor: scheduledFor,
         );

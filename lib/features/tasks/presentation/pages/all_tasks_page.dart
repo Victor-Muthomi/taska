@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shopping/presentation/widgets/shopping_task_items_preview.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_providers.dart';
 import 'tasks_page.dart';
@@ -221,6 +222,11 @@ class _AllTaskCard extends ConsumerWidget {
                             _TaskMetaChip(icon: Icons.schedule_outlined, label: task.timeLabel),
                             _TaskMetaChip(icon: Icons.repeat_rounded, label: _repeatLabel(task.repeat)),
                             _TaskMetaChip(icon: Icons.notifications_active_outlined, label: _statusLabel(task.status)),
+                            if (task.type == TaskType.shopping)
+                              const _TaskMetaChip(
+                                icon: Icons.shopping_cart_outlined,
+                                label: 'Shopping',
+                              ),
                             _TaskMetaChip(icon: Icons.wb_sunny_outlined, label: _slotLabel(task.slot)),
                           ],
                         ),
@@ -245,6 +251,7 @@ class _AllTaskCard extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
+              ShoppingTaskItemsPreview(taskId: task.id, taskType: task.type),
               const SizedBox(height: 10),
               Text(
                 'Updated ${_formatDateTime(task.updatedAt)} · Next reminder ${_formatDateTime(task.nextReminderAt)}',

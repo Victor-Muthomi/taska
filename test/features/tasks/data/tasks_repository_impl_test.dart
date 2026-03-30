@@ -90,6 +90,7 @@ Task _task({required String title}) {
     title: title,
     notes: null,
     timeLabel: '08:00',
+    type: TaskType.normal,
     slot: TaskSlot.morning,
     repeat: TaskRepeat.none,
     status: TaskReminderStatus.pending,

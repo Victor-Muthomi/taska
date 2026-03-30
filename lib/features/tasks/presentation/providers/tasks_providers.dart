@@ -68,10 +68,11 @@ class TasksController extends AsyncNotifier<List<Task>> {
     return _refreshTasks();
   }
 
-  Future<void> addTask({
+  Future<Task> addTask({
     required String title,
     String? notes,
     required String timeLabel,
+    required TaskType type,
     required TaskSlot slot,
     required TaskRepeat repeat,
     DateTime? scheduledFor,
@@ -86,6 +87,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
             title: title,
             notes: notes,
             timeLabel: normalizedTime,
+            type: type,
             slot: slot,
             repeat: repeat,
             status: TaskReminderStatus.pending,
@@ -110,6 +112,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
       await scheduleReminder(createdTask);
     }
     state = AsyncData(await _refreshTasks());
+    return createdTask;
   }
 
   Future<void> updateTaskDetails({
@@ -117,6 +120,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
     required String title,
     String? notes,
     required String timeLabel,
+    required TaskType type,
     required TaskSlot slot,
     required TaskRepeat repeat,
     DateTime? scheduledFor,
@@ -131,6 +135,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
             title: title,
             notes: notes,
             timeLabel: normalizedTime,
+            type: type,
             slot: slot,
             repeat: repeat,
             status: TaskReminderStatus.pending,

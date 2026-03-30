@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shopping/presentation/widgets/shopping_task_items_preview.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_providers.dart';
 import '../widgets/task_calendar_utils.dart';
@@ -404,14 +405,24 @@ class _SelectedDateTasksCard extends StatelessWidget {
               )
             else
               for (final task in tasks)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(task.title),
-                  subtitle: Text('${task.timeLabel} · ${_statusLabel(task.status)}'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    onPressed: () => onEditTask(task),
-                  ),
+                Column(
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(task.title),
+                      subtitle: Text(
+                        '${task.timeLabel} · ${_statusLabel(task.status)}',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => onEditTask(task),
+                      ),
+                    ),
+                    ShoppingTaskItemsPreview(
+                      taskId: task.id,
+                      taskType: task.type,
+                    ),
+                  ],
                 ),
           ],
         ),

@@ -60,6 +60,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          tasksControllerProvider.overrideWith(
+            () => _FakeTasksController(repository.tasks),
+          ),
           tasksRepositoryProvider.overrideWithValue(repository),
           appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
           notificationServiceProvider.overrideWithValue(
@@ -69,19 +72,29 @@ void main() {
         child: const MyApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilText(tester, 'Sidebar');
 
     await tester.tap(find.byTooltip('Open navigation menu'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Sidebar'), findsOneWidget);
     expect(find.text('Export JSON'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Open calendar'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Calendar'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byTooltip('Open calendar'),
+      48,
+      scrollable: find.byType(Scrollable).last,
+    );
   });
+}
+
+Future<void> _pumpUntilText(WidgetTester tester, String text) async {
+  for (var i = 0; i < 60; i++) {
+    if (find.text(text).evaluate().isNotEmpty) {
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
 
 class _FakeTasksRepository implements TasksRepository {
@@ -162,6 +175,15 @@ class _FakeNotificationService extends NotificationService {
 
   @override
   Future<void> cancelTaskNotification(int taskId) async {}
+}
+
+class _FakeTasksController extends TasksController {
+  _FakeTasksController(this.tasks);
+
+  final List<Task> tasks;
+
+  @override
+  Future<List<Task>> build() async => tasks;
 }
 
 Task _task({

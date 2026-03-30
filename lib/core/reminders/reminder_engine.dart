@@ -28,6 +28,35 @@ class ReminderEngine {
     );
   }
 
+  Task applyShoppingItemRules(
+    Task task, {
+    required bool hasIncompleteItems,
+    DateTime? from,
+  }) {
+    if (task.type != TaskType.shopping || !hasIncompleteItems) {
+      return task;
+    }
+
+    final normalizedTime = SlotSchedule.normalizeTimeForSlot(
+      task.timeLabel,
+      TaskSlot.evening,
+    );
+    return task.copyWith(
+      slot: TaskSlot.evening,
+      timeLabel: normalizedTime,
+      nextReminderAt: SlotSchedule.nextDateTimeForTask(
+        timeLabel: normalizedTime,
+        slot: TaskSlot.evening,
+        repeat: task.repeat,
+        from: from ?? DateTime.now(),
+      ),
+      reminderIntervalMinutes: _baseInterval(TaskSlot.evening),
+      reminderIntensity: settings.preferredReminderIntensity,
+      ignoredCount: 0,
+      completionRate: 0,
+    );
+  }
+
   Task applyCompletion(Task task, List<TaskLog> logs) {
     final now = DateTime.now();
     final completionRate = computeCompletionRate(

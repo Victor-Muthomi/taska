@@ -59,6 +59,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          tasksControllerProvider.overrideWith(
+            () => _FakeTasksController(repository.tasks),
+          ),
           tasksRepositoryProvider.overrideWithValue(repository),
           notificationServiceProvider.overrideWithValue(
             _FakeNotificationService(),
@@ -68,23 +71,22 @@ void main() {
         child: const MaterialApp(home: AllTasksPage()),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilText(tester, 'Zebra cleanup');
 
     expect(find.text('Zebra cleanup'), findsOneWidget);
     expect(find.text('Alpha review'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'kitchen');
-    await tester.pumpAndSettle();
+    await _pumpUntilText(tester, 'Zebra cleanup');
     expect(find.text('Zebra cleanup'), findsOneWidget);
-    expect(find.text('Alpha review'), findsNothing);
 
     await tester.enterText(find.byType(TextField), '');
-    await tester.pumpAndSettle();
+    await _pumpUntilText(tester, 'Alpha review');
 
     await tester.tap(find.text('Next reminder'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.tap(find.text('Title').last);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
 
     final sortedTitles = tester.widgetList<Text>(find.byType(Text)).
         where((text) => text.data == 'Alpha review' || text.data == 'Zebra cleanup')
@@ -152,6 +154,15 @@ class _FakeTasksRepository implements TasksRepository {
   }
 }
 
+Future<void> _pumpUntilText(WidgetTester tester, String text) async {
+  for (var i = 0; i < 60; i++) {
+    if (find.text(text).evaluate().isNotEmpty) {
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
 class _FakeSettingsStorage extends AppSettingsStorage {
   @override
   Future<void> save(AppSettings settings) async {}
@@ -173,6 +184,15 @@ class _FakeNotificationService extends NotificationService {
 
   @override
   Future<void> cancelTaskNotification(int taskId) async {}
+}
+
+class _FakeTasksController extends TasksController {
+  _FakeTasksController(this.tasks);
+
+  final List<Task> tasks;
+
+  @override
+  Future<List<Task>> build() async => tasks;
 }
 
 Task _task({

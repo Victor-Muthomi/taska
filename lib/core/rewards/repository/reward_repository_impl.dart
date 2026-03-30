@@ -45,7 +45,11 @@ class RewardRepositoryImpl implements RewardRepository {
   @override
   Future<List<TaskLog>> getAllTaskLogs() async {
     final db = await _databaseGetter();
-    final rows = await db.query('task_logs', orderBy: 'logged_at ASC');
+    final rows = await db.query(
+      'task_logs',
+      where: 'task_id IS NOT NULL',
+      orderBy: 'logged_at ASC',
+    );
     return rows.map(_taskLogFromMap).toList();
   }
 

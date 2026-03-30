@@ -1,5 +1,7 @@
 enum TaskSlot { morning, afternoon, evening, night }
 
+enum TaskType { normal, shopping }
+
 enum TaskReminderStatus { pending, completed, snoozed, ignored }
 
 enum TaskReminderIntensity { low, normal, high }
@@ -12,6 +14,7 @@ class Task {
     required this.title,
     this.notes,
     required this.timeLabel,
+    this.type = TaskType.normal,
     required this.slot,
     required this.repeat,
     required this.status,
@@ -29,6 +32,7 @@ class Task {
   final String title;
   final String? notes;
   final String timeLabel;
+  final TaskType type;
   final TaskSlot slot;
   final TaskRepeat repeat;
   final TaskReminderStatus status;
@@ -46,6 +50,7 @@ class Task {
     String? title,
     String? notes,
     String? timeLabel,
+    TaskType? type,
     TaskSlot? slot,
     TaskRepeat? repeat,
     TaskReminderStatus? status,
@@ -63,6 +68,7 @@ class Task {
       title: title ?? this.title,
       notes: notes ?? this.notes,
       timeLabel: timeLabel ?? this.timeLabel,
+      type: type ?? this.type,
       slot: slot ?? this.slot,
       repeat: repeat ?? this.repeat,
       status: status ?? this.status,

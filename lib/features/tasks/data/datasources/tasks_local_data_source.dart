@@ -29,7 +29,11 @@ class TasksLocalDataSource {
 
   Future<List<TaskLogModel>> getAllTaskLogs() async {
     final db = await _databaseHelper.database;
-    final rows = await db.query('task_logs', orderBy: 'logged_at DESC');
+    final rows = await db.query(
+      'task_logs',
+      where: 'task_id IS NOT NULL',
+      orderBy: 'logged_at DESC',
+    );
     return rows.map(TaskLogModel.fromMap).toList();
   }
 

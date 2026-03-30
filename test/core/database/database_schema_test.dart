@@ -34,9 +34,59 @@ void main() {
 
     final names = tables.map((row) => row['name']).toSet();
     expect(names, contains('tasks'));
+    expect(names, contains('shopping_items'));
     expect(names, contains('task_logs'));
     expect(names, contains('user_stats'));
     expect(names, contains('achievements'));
+  });
+
+  test('creates shopping_items table with expected columns', () async {
+    final columns = await database.rawQuery('PRAGMA table_info(shopping_items)');
+    final names = columns.map((row) => row['name']).toSet();
+
+    expect(names, contains('id'));
+    expect(names, contains('name'));
+    expect(names, contains('category'));
+    expect(names, contains('is_completed'));
+    expect(names, contains('linked_task_id'));
+    expect(names, contains('session_id'));
+    expect(names, contains('created_at'));
+  });
+
+  test('creates shopping_items foreign key to shopping_sessions', () async {
+    final foreignKeys = await database.rawQuery(
+      'PRAGMA foreign_key_list(shopping_items)',
+    );
+
+    expect(foreignKeys, isNotEmpty);
+    expect(
+      foreignKeys.any((row) => row['table'] == 'shopping_sessions'),
+      isTrue,
+    );
+  });
+
+  test('creates shopping_sessions table with expected columns', () async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info(shopping_sessions)',
+    );
+    final names = columns.map((row) => row['name']).toSet();
+
+    expect(names, contains('id'));
+    expect(names, contains('date'));
+    expect(names, contains('title'));
+    expect(names, contains('status'));
+    expect(names, contains('created_at'));
+  });
+
+  test('creates task_logs columns for shopping events', () async {
+    final columns = await database.rawQuery('PRAGMA table_info(task_logs)');
+    final names = columns.map((row) => row['name']).toSet();
+
+    expect(names, contains('task_id'));
+    expect(names, contains('shopping_item_id'));
+    expect(names, contains('action'));
+    expect(names, contains('logged_at'));
+    expect(names, contains('metadata'));
   });
 
   test('seeds a default user stats row', () async {

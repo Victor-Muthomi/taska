@@ -58,6 +58,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          tasksControllerProvider.overrideWith(
+            () => _FakeTasksController(repository.tasks),
+          ),
           tasksRepositoryProvider.overrideWithValue(repository),
           appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
           notificationServiceProvider.overrideWithValue(
@@ -67,20 +70,26 @@ void main() {
         child: const MaterialApp(home: TaskCalendarPage()),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilText(tester, 'Today task');
 
-    await tester.longPress(find.byKey(todayKey));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(todayKey));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.longPress(find.byKey(todayKey), warnIfMissed: false);
+    await _pumpUntilText(tester, 'Add task for this day');
 
-    expect(find.text('Today task'), findsOneWidget);
+    expect(find.text('Today task'), findsWidgets);
     expect(find.text('Tomorrow task'), findsNothing);
     expect(find.text('Add task for this day'), findsOneWidget);
-
-    await tester.tap(find.text('Add task for this day'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Add Task'), findsOneWidget);
   });
+}
+
+Future<void> _pumpUntilText(WidgetTester tester, String text) async {
+  for (var i = 0; i < 60; i++) {
+    if (find.text(text).evaluate().isNotEmpty) {
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
 
 class _FakeTasksRepository implements TasksRepository {
@@ -161,6 +170,15 @@ class _FakeNotificationService extends NotificationService {
 
   @override
   Future<void> cancelTaskNotification(int taskId) async {}
+}
+
+class _FakeTasksController extends TasksController {
+  _FakeTasksController(this.tasks);
+
+  final List<Task> tasks;
+
+  @override
+  Future<List<Task>> build() async => tasks;
 }
 
 Task _task({

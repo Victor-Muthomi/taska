@@ -6,6 +6,9 @@ import '../../../../core/notifications/notification_logic.dart';
 import '../../../../core/notifications/notification_providers.dart';
 import '../../../../core/scheduling/slot_schedule.dart';
 import '../../../../core/settings/app_settings_providers.dart';
+import '../../../shopping/presentation/providers/shopping_providers.dart';
+import '../../../shopping/presentation/widgets/shopping_task_items_preview.dart';
+import '../../../shopping/presentation/widgets/shopping_task_items_editor.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_providers.dart';
 
@@ -43,6 +46,7 @@ class TasksPage extends ConsumerWidget {
               ref: bottomSheetRef,
               initialScheduledFor:
                   scheduledFor ?? existingTask?.nextReminderAt ?? DateTime.now(),
+              initialType: existingTask?.type ?? TaskType.normal,
             );
           },
         );
@@ -143,6 +147,7 @@ class TasksPage extends ConsumerWidget {
         initialSlot: selectedSlot,
         initialRepeat: selectedRepeat,
         initialScheduledFor: initialScheduledFor,
+        initialType: existingTask?.type ?? TaskType.normal,
       ),
     );
   }
@@ -158,6 +163,7 @@ class _TaskFormSheet extends StatefulWidget {
     this.timeController,
     this.initialSlot = TaskSlot.morning,
     this.initialRepeat = TaskRepeat.none,
+    this.initialType = TaskType.normal,
     required this.initialScheduledFor,
   });
 
@@ -169,6 +175,7 @@ class _TaskFormSheet extends StatefulWidget {
   final TextEditingController? timeController;
   final TaskSlot initialSlot;
   final TaskRepeat initialRepeat;
+  final TaskType initialType;
   final DateTime initialScheduledFor;
 
   @override
@@ -181,10 +188,13 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
   late final TextEditingController _notesController;
   late final TextEditingController _dateController;
   late final TextEditingController _timeController;
+  late final TextEditingController _shoppingItemController;
   late TaskSlot _selectedSlot;
   late TaskRepeat _selectedRepeat;
+  late TaskType _selectedType;
   late DateTime _selectedDate;
   bool _isSaving = false;
+  final List<String> _pendingShoppingItems = [];
 
   @override
   void initState() {
@@ -200,8 +210,10 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
         TextEditingController(text: widget.existingTask?.timeLabel ?? '08:00');
     _selectedSlot = widget.initialSlot;
     _selectedRepeat = widget.initialRepeat;
+    _selectedType = widget.initialType;
     _selectedDate = DateUtils.dateOnly(widget.initialScheduledFor);
     _dateController = TextEditingController(text: _formatDate(_selectedDate));
+    _shoppingItemController = TextEditingController();
   }
 
   @override
@@ -216,6 +228,7 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
     if (widget.timeController == null) {
       _timeController.dispose();
     }
+    _shoppingItemController.dispose();
     super.dispose();
   }
 
@@ -337,6 +350,30 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
                 },
               ),
               const SizedBox(height: 12),
+              DropdownButtonFormField<TaskType>(
+                initialValue: _selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Task type',
+                  border: OutlineInputBorder(),
+                ),
+                items: TaskType.values
+                    .map(
+                      (type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(
+                          type == TaskType.shopping ? 'Shopping' : 'Normal',
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() => _selectedType = value);
+                },
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _timeController,
                 readOnly: true,
@@ -408,6 +445,27 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              if (_selectedType == TaskType.shopping) ...[
+                const SizedBox(height: 12),
+                ShoppingTaskItemsEditor(
+                  taskId: widget.existingTask?.id?.toString(),
+                  pendingItemNames: _pendingShoppingItems,
+                  onQueueItem: _queueShoppingItem,
+                  onRemoveQueuedItem: _removeQueuedShoppingItem,
+                  onLinkItem: (name) async {
+                    final taskId = widget.existingTask?.id;
+                    if (taskId == null) {
+                      _queueShoppingItem(name);
+                      return;
+                    }
+
+                    await widget.ref.read(shoppingItemsControllerProvider.notifier).addItem(
+                      name: name,
+                      linkedTaskId: taskId.toString(),
+                    );
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -442,16 +500,26 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
 
     try {
       if (widget.existingTask == null) {
-        await widget.ref
+        final createdTask = await widget.ref
             .read(tasksControllerProvider.notifier)
             .addTask(
               title: title,
               notes: notes,
               timeLabel: _timeController.text,
+              type: _selectedType,
               slot: _selectedSlot,
               repeat: _selectedRepeat,
               scheduledFor: _selectedDate,
             );
+        if (_selectedType == TaskType.shopping && createdTask.id != null) {
+          for (final itemName in _pendingShoppingItems) {
+            await widget.ref.read(shoppingItemsControllerProvider.notifier).addItem(
+              name: itemName,
+              linkedTaskId: createdTask.id.toString(),
+            );
+          }
+          _pendingShoppingItems.clear();
+        }
       } else {
         await widget.ref
             .read(tasksControllerProvider.notifier)
@@ -460,6 +528,7 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
               title: title,
               notes: notes,
               timeLabel: _timeController.text,
+              type: _selectedType,
               slot: _selectedSlot,
               repeat: _selectedRepeat,
               scheduledFor: _selectedDate,
@@ -483,6 +552,25 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  void _queueShoppingItem(String itemName) {
+    final value = itemName.trim();
+    if (value.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      if (!_pendingShoppingItems.contains(value)) {
+        _pendingShoppingItems.add(value);
+      }
+    });
+  }
+
+  void _removeQueuedShoppingItem(String itemName) {
+    setState(() {
+      _pendingShoppingItems.remove(itemName);
+    });
   }
 }
 
@@ -787,6 +875,11 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                                 icon: Icons.notifications_active_outlined,
                                 label: _statusLabel(task.status),
                               ),
+                              if (task.type == TaskType.shopping)
+                                const _MetaChip(
+                                  icon: Icons.shopping_cart_outlined,
+                                  label: 'Shopping',
+                                ),
                             ],
                           ),
                         ],
@@ -831,6 +924,10 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               ],
+                              ShoppingTaskItemsPreview(
+                                taskId: task.id,
+                                taskType: task.type,
+                              ),
                               const SizedBox(height: 12),
                               Text(
                                 'Next reminder ${_formatReminderTime(task.nextReminderAt)}',

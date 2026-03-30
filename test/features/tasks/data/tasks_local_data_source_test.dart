@@ -88,6 +88,7 @@ TaskModel _taskModel({required String title}) {
     title: title,
     notes: 'notes',
     timeLabel: '08:00',
+    type: TaskType.normal,
     slot: TaskSlot.morning,
     repeat: TaskRepeat.none,
     status: TaskReminderStatus.pending,

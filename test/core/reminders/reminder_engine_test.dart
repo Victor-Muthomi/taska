@@ -34,9 +34,9 @@ void main() {
 
     final planned = engine.createInitialPlan(task);
 
-    expect(planned.timeLabel, '21:59');
-    expect(planned.nextReminderAt.hour, 21);
-    expect(planned.nextReminderAt.minute, 59);
+    expect(planned.timeLabel, '22:00');
+    expect(planned.nextReminderAt.hour, 22);
+    expect(planned.nextReminderAt.minute, 0);
   });
 
   test('weekday repeat skips weekend when computing next occurrence', () {
