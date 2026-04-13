@@ -34,9 +34,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
   Future<void> _bootstrapCurrentSession({String? preferredSessionId}) async {
     try {
-      final repository = ref.read(shoppingRepositoryProvider);
+      final shoppingService = ref.read(shoppingServiceProvider);
       final controller = ref.read(shoppingItemsControllerProvider.notifier);
-      final sessions = await repository.getSessions();
+      final sessions = await shoppingService.getSessionsWithResolvedStatus();
       final today = DateUtils.dateOnly(DateTime.now());
 
       ShoppingSession? selectedSession;
@@ -165,6 +165,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
     final items = controller.items;
     final categories = _sortedCategories(items);
+    final totalCost = _totalCost(items);
+    final remainingCost = _totalCost(items.where((item) => !item.isCompleted));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Shopping Lists')),
@@ -227,13 +229,20 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               const SizedBox(height: 16),
               AddItemInput(
                 categoryOptions: categories,
-                onAdd: (name, category) {
+                onAdd: (name, category, quantity, pricePerItem) {
                   return controller.addItem(
                     name: name,
                     category: category,
+                    quantity: quantity,
+                    pricePerItem: pricePerItem,
                     sessionId: session.id,
                   );
                 },
+              ),
+              const SizedBox(height: 12),
+              _CostSummaryCard(
+                totalCost: totalCost,
+                remainingCost: remainingCost,
               ),
               const SizedBox(height: 12),
               suggestionsState.when(
@@ -292,6 +301,18 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     return 'Session for ${_formatDate(session.date)}';
   }
 
+  double _totalCost(Iterable<ShoppingItem> items) {
+    var total = 0.0;
+    for (final item in items) {
+      final unitPrice = item.pricePerItem;
+      if (unitPrice == null) {
+        continue;
+      }
+      total += unitPrice * item.quantity;
+    }
+    return total;
+  }
+
   String _formatDate(DateTime date) {
     final local = DateUtils.dateOnly(date.toLocal());
     return '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
@@ -339,6 +360,44 @@ class _SessionSwitcherCard extends StatelessWidget {
                         : (_) => onSelected(session.id),
                   ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CostSummaryCard extends StatelessWidget {
+  const _CostSummaryCard({
+    required this.totalCost,
+    required this.remainingCost,
+  });
+
+  final double totalCost;
+  final double remainingCost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Cost summary',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Total: \$${totalCost.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Remaining (unchecked): \$${remainingCost.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
         ),
@@ -458,6 +517,15 @@ class _ShoppingItemTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final hasPrice = item.pricePerItem != null;
+    final total = hasPrice ? item.pricePerItem! * item.quantity : null;
+    final meta = <String>['Qty ${item.quantity}', item.category];
+    if (hasPrice) {
+      meta.add(
+        '\$${item.pricePerItem!.toStringAsFixed(2)} each · \$${total!.toStringAsFixed(2)} total',
+      );
+    }
+
     final titleStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
       decoration: item.isCompleted ? TextDecoration.lineThrough : null,
       color: item.isCompleted ? Theme.of(context).colorScheme.outline : null,
@@ -495,9 +563,12 @@ class _ShoppingItemTile extends ConsumerWidget {
         },
         title: Text(item.name, style: titleStyle),
         subtitle: item.linkedTaskId == null
-            ? Text(item.category, style: Theme.of(context).textTheme.bodySmall)
+            ? Text(
+                meta.join(' · '),
+                style: Theme.of(context).textTheme.bodySmall,
+              )
             : Text(
-                'Linked to task ${item.linkedTaskId}',
+                '${meta.join(' · ')} · Linked to task ${item.linkedTaskId}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
       ),

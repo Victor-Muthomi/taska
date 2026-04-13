@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shopping/presentation/pages/shopping_list_screen.dart';
+import '../../../shopping/presentation/providers/shopping_providers.dart';
 import '../../../shopping/presentation/widgets/shopping_task_items_preview.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_providers.dart';
@@ -111,6 +113,50 @@ class _TaskCalendarPageState extends ConsumerState<TaskCalendarPage> {
                     context,
                     ref: ref,
                     scheduledFor: date,
+                    initialTitle: 'Event',
+                  );
+                });
+              },
+              onAddEvent: () {
+                Navigator.of(sheetContext).pop();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!context.mounted) {
+                    return;
+                  }
+                  TasksPage.showTaskFormSheet(
+                    context,
+                    ref: ref,
+                    scheduledFor: date,
+                  );
+                });
+              },
+              onAddShoppingList: () {
+                Navigator.of(sheetContext).pop();
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (!context.mounted) {
+                    return;
+                  }
+
+                  final title = await _showCreateShoppingListDialog(
+                    context,
+                    date,
+                  );
+                  if (title == null || !context.mounted) {
+                    return;
+                  }
+
+                  final createdSession = await ref
+                      .read(shoppingItemsControllerProvider.notifier)
+                      .createSession(DateUtils.dateOnly(date), title);
+                  if (!context.mounted) {
+                    return;
+                  }
+
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ShoppingListScreen(initialSessionId: createdSession.id),
+                    ),
                   );
                 });
               },
@@ -133,6 +179,59 @@ class _TaskCalendarPageState extends ConsumerState<TaskCalendarPage> {
         );
       },
     );
+  }
+
+  Future<String?> _showCreateShoppingListDialog(
+    BuildContext context,
+    DateTime date,
+  ) async {
+    final controller = TextEditingController();
+    final normalizedDate = DateUtils.dateOnly(date);
+    final fallbackTitle =
+        'Shopping List ${normalizedDate.year.toString().padLeft(4, '0')}-${normalizedDate.month.toString().padLeft(2, '0')}-${normalizedDate.day.toString().padLeft(2, '0')}';
+
+    try {
+      return showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Add shopping list'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'List name',
+                hintText: 'Weekend groceries',
+              ),
+              onSubmitted: (_) {
+                final value = controller.text.trim();
+                Navigator.of(
+                  dialogContext,
+                ).pop(value.isEmpty ? fallbackTitle : value);
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final value = controller.text.trim();
+                  Navigator.of(
+                    dialogContext,
+                  ).pop(value.isEmpty ? fallbackTitle : value);
+                },
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 }
 
@@ -320,12 +419,16 @@ class _DayActionsSheet extends StatelessWidget {
     required this.date,
     required this.tasks,
     required this.onAddTask,
+    required this.onAddEvent,
+    required this.onAddShoppingList,
     required this.onEditTask,
   });
 
   final DateTime date;
   final List<Task> tasks;
   final VoidCallback onAddTask;
+  final VoidCallback onAddEvent;
+  final VoidCallback onAddShoppingList;
   final ValueChanged<Task> onEditTask;
 
   @override
@@ -340,7 +443,7 @@ class _DayActionsSheet extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Add a new task or update an existing one for this day.',
+          'Add a task, event, or shopping list for this day.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -350,6 +453,24 @@ class _DayActionsSheet extends StatelessWidget {
             onPressed: onAddTask,
             icon: const Icon(Icons.add_task_rounded),
             label: const Text('Add task for this day'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onAddEvent,
+            icon: const Icon(Icons.event_outlined),
+            label: const Text('Add event'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onAddShoppingList,
+            icon: const Icon(Icons.shopping_cart_outlined),
+            label: const Text('Add shopping list'),
           ),
         ),
         const SizedBox(height: 16),

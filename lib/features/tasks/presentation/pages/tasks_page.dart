@@ -6,6 +6,7 @@ import '../../../../core/notifications/notification_logic.dart';
 import '../../../../core/notifications/notification_providers.dart';
 import '../../../../core/scheduling/slot_schedule.dart';
 import '../../../../core/settings/app_settings_providers.dart';
+import '../../../shopping/domain/entities/shopping_item.dart';
 import '../../../shopping/presentation/providers/shopping_providers.dart';
 import '../../../shopping/presentation/widgets/shopping_task_items_preview.dart';
 import '../../../shopping/presentation/widgets/shopping_task_items_editor.dart';
@@ -22,6 +23,7 @@ class TasksPage extends ConsumerWidget {
     WidgetRef? ref,
     Task? existingTask,
     DateTime? scheduledFor,
+    String? initialTitle,
   }) async {
     if (ref != null) {
       final page = TasksPage();
@@ -30,6 +32,7 @@ class TasksPage extends ConsumerWidget {
         ref,
         existingTask: existingTask,
         scheduledFor: scheduledFor,
+        initialTitle: initialTitle,
       );
       return;
     }
@@ -44,6 +47,7 @@ class TasksPage extends ConsumerWidget {
               existingTask: existingTask,
               scheduledFor: scheduledFor,
               ref: bottomSheetRef,
+              initialTitle: initialTitle,
               initialScheduledFor:
                   scheduledFor ?? existingTask?.nextReminderAt ?? DateTime.now(),
               initialType: existingTask?.type ?? TaskType.normal,
@@ -58,6 +62,8 @@ class TasksPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksState = ref.watch(tasksControllerProvider);
     final settings = ref.watch(appSettingsProvider);
+    final shoppingItemsState = ref.watch(shoppingItemsControllerProvider);
+    final shoppingItems = shoppingItemsState.valueOrNull ?? const <ShoppingItem>[];
 
     ref.listen(notificationEventsProvider, (previous, next) {
       next.whenData((event) async {
@@ -82,7 +88,10 @@ class TasksPage extends ConsumerWidget {
     });
 
     final body = tasksState.when(
-      data: (tasks) => _DashboardView(tasks: tasks),
+      data: (tasks) => _DashboardView(
+        tasks: tasks,
+        shoppingItems: shoppingItems,
+      ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Failed to load tasks: $error')),
     );
@@ -119,9 +128,10 @@ class TasksPage extends ConsumerWidget {
     WidgetRef ref, {
     Task? existingTask,
     DateTime? scheduledFor,
+    String? initialTitle,
   }) async {
     final titleController = TextEditingController(
-      text: existingTask?.title ?? '',
+      text: existingTask?.title ?? initialTitle ?? '',
     );
     final notesController = TextEditingController(
       text: existingTask?.notes ?? '',
@@ -141,6 +151,7 @@ class TasksPage extends ConsumerWidget {
         existingTask: existingTask,
         scheduledFor: scheduledFor,
         ref: ref,
+        initialTitle: initialTitle,
         titleController: titleController,
         notesController: notesController,
         timeController: timeController,
@@ -158,6 +169,7 @@ class _TaskFormSheet extends StatefulWidget {
     required this.ref,
     this.existingTask,
     this.scheduledFor,
+    this.initialTitle,
     this.titleController,
     this.notesController,
     this.timeController,
@@ -170,6 +182,7 @@ class _TaskFormSheet extends StatefulWidget {
   final WidgetRef ref;
   final Task? existingTask;
   final DateTime? scheduledFor;
+  final String? initialTitle;
   final TextEditingController? titleController;
   final TextEditingController? notesController;
   final TextEditingController? timeController;
@@ -201,7 +214,9 @@ class _TaskFormSheetState extends State<_TaskFormSheet> {
     super.initState();
     _titleController =
         widget.titleController ??
-        TextEditingController(text: widget.existingTask?.title ?? '');
+        TextEditingController(
+          text: widget.existingTask?.title ?? widget.initialTitle ?? '',
+        );
     _notesController =
         widget.notesController ??
         TextEditingController(text: widget.existingTask?.notes ?? '');
@@ -609,13 +624,16 @@ class _FormInfoBanner extends StatelessWidget {
 }
 
 class _DashboardView extends StatelessWidget {
-  const _DashboardView({required this.tasks});
+  const _DashboardView({required this.tasks, required this.shoppingItems});
 
   final List<Task> tasks;
+  final List<ShoppingItem> shoppingItems;
 
   @override
   Widget build(BuildContext context) {
-    final todaysTasks = tasks.where(_shouldShowOnHome).toList();
+    final todaysTasks = tasks
+        .where((task) => _shouldShowOnHome(task, shoppingItems))
+        .toList();
     final grouped = {
       for (final slot in TaskSlot.values)
         slot: todaysTasks.where((task) => task.slot == slot).toList(),
@@ -656,7 +674,10 @@ class _DashboardView extends StatelessWidget {
                       ),
                     );
                   },
-                  child: _DashboardSummary(tasks: todaysTasks),
+                  child: _DashboardSummary(
+                    tasks: todaysTasks,
+                    shoppingItems: shoppingItems,
+                  ),
                 ),
               ],
             ),
@@ -675,6 +696,7 @@ class _DashboardView extends StatelessWidget {
               child: _TaskSlotSection(
                 slot: slot,
                 tasks: grouped[slot] ?? const [],
+                shoppingItems: shoppingItems,
               ),
             ),
         const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
@@ -684,14 +706,15 @@ class _DashboardView extends StatelessWidget {
 }
 
 class _DashboardSummary extends StatelessWidget {
-  const _DashboardSummary({required this.tasks});
+  const _DashboardSummary({required this.tasks, required this.shoppingItems});
 
   final List<Task> tasks;
+  final List<ShoppingItem> shoppingItems;
 
   @override
   Widget build(BuildContext context) {
     final completed = tasks
-        .where((task) => task.status == TaskReminderStatus.completed)
+        .where((task) => _homeTaskStatus(task, shoppingItems) == TaskReminderStatus.completed)
         .length;
     final snoozed = tasks
         .where((task) => task.status == TaskReminderStatus.snoozed)
@@ -751,10 +774,15 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _TaskSlotSection extends StatelessWidget {
-  const _TaskSlotSection({required this.slot, required this.tasks});
+  const _TaskSlotSection({
+    required this.slot,
+    required this.tasks,
+    required this.shoppingItems,
+  });
 
   final TaskSlot slot;
   final List<Task> tasks;
+  final List<ShoppingItem> shoppingItems;
 
   @override
   Widget build(BuildContext context) {
@@ -815,7 +843,10 @@ class _TaskSlotSection extends StatelessWidget {
               )
             else
               Column(
-                children: [for (final task in tasks) _TaskCard(task: task)],
+                children: [
+                  for (final task in tasks)
+                    _TaskCard(task: task, shoppingItems: shoppingItems),
+                ],
               ),
           ],
         ),
@@ -825,9 +856,10 @@ class _TaskSlotSection extends StatelessWidget {
 }
 
 class _TaskCard extends ConsumerStatefulWidget {
-  const _TaskCard({required this.task});
+  const _TaskCard({required this.task, required this.shoppingItems});
 
   final Task task;
+  final List<ShoppingItem> shoppingItems;
 
   @override
   ConsumerState<_TaskCard> createState() => _TaskCardState();
@@ -839,155 +871,212 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
+    final displayStatus = _homeTaskStatus(task, widget.shoppingItems);
+    final taskId = task.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            task.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _MetaChip(
-                                icon: Icons.schedule_outlined,
-                                label: task.timeLabel,
-                              ),
-                              _MetaChip(
-                                icon: Icons.notifications_active_outlined,
-                                label: _statusLabel(task.status),
-                              ),
-                              if (task.type == TaskType.shopping)
-                                const _MetaChip(
-                                  icon: Icons.shopping_cart_outlined,
-                                  label: 'Shopping',
-                                ),
-                            ],
-                          ),
-                        ],
+      child: Dismissible(
+        key: ValueKey('task-${task.id ?? task.title}-${task.nextReminderAt.toIso8601String()}'),
+        direction: DismissDirection.startToEnd,
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.delete_outline,
+            color: Theme.of(context).colorScheme.onErrorContainer,
+          ),
+        ),
+        confirmDismiss: (_) async {
+          if (taskId == null) {
+            return false;
+          }
+
+          final shouldDelete =
+              await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) {
+                  return AlertDialog(
+                    title: const Text('Delete task'),
+                    content: Text('Delete "${task.title}"?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: const Text('Cancel'),
                       ),
-                    ),
-                    Icon(
-                      _expanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: _expanded
-                      ? Padding(
-                          key: const ValueKey('expanded'),
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _MetaChip(
-                                    icon: Icons.wb_sunny_outlined,
-                                    label:
-                                        '${_slotLabel(task.slot)} ${_slotWindowLabel(task.slot)}',
+                      FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  );
+                },
+              ) ??
+              false;
+
+          if (!shouldDelete) {
+            return false;
+          }
+
+          await ref.read(tasksControllerProvider.notifier).delete(taskId);
+          return true;
+        },
+        onDismissed: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Deleted "${task.title}"')),
+          );
+        },
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task.title,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _MetaChip(
+                                  icon: Icons.schedule_outlined,
+                                  label: task.timeLabel,
+                                ),
+                                _MetaChip(
+                                  icon: Icons.notifications_active_outlined,
+                                  label: _statusLabel(displayStatus),
+                                ),
+                                if (task.type == TaskType.shopping)
+                                  const _MetaChip(
+                                    icon: Icons.shopping_cart_outlined,
+                                    label: 'Shopping',
                                   ),
-                                  _MetaChip(
-                                    icon: Icons.repeat_rounded,
-                                    label: _repeatLabel(task.repeat),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        _expanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: _expanded
+                        ? Padding(
+                            key: const ValueKey('expanded'),
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    _MetaChip(
+                                      icon: Icons.wb_sunny_outlined,
+                                      label:
+                                          '${_slotLabel(task.slot)} ${_slotWindowLabel(task.slot)}',
+                                    ),
+                                    _MetaChip(
+                                      icon: Icons.repeat_rounded,
+                                      label: _repeatLabel(task.repeat),
+                                    ),
+                                  ],
+                                ),
+                                if (task.notes != null && task.notes!.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    task.notes!,
+                                    style: Theme.of(context).textTheme.bodyMedium,
                                   ),
                                 ],
-                              ),
-                              if (task.notes != null && task.notes!.isNotEmpty) ...[
+                                ShoppingTaskItemsPreview(
+                                  taskId: task.id,
+                                  taskType: task.type,
+                                ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  task.notes!,
-                                  style: Theme.of(context).textTheme.bodyMedium,
+                                  'Next reminder ${_formatReminderTime(task.nextReminderAt)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: FilledButton.icon(
+                                        onPressed: () async {
+                                          await ref
+                                              .read(tasksControllerProvider.notifier)
+                                              .markTaskDone(task);
+                                        },
+                                        icon: const Icon(Icons.check_circle_outline),
+                                        label: const Text('Done'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () async {
+                                          await ref
+                                              .read(tasksControllerProvider.notifier)
+                                              .toggleSnoozeTask(task);
+                                        },
+                                        icon: Icon(
+                                          task.status == TaskReminderStatus.snoozed
+                                              ? Icons.notifications_active_outlined
+                                              : Icons.snooze_outlined,
+                                        ),
+                                        label: Text(
+                                          task.status == TaskReminderStatus.snoozed
+                                              ? 'Unsnooze'
+                                              : 'Snooze',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () => _showTaskFormSheet(
+                                      context,
+                                      ref,
+                                      existingTask: task,
+                                    ),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Edit'),
+                                  ),
                                 ),
                               ],
-                              ShoppingTaskItemsPreview(
-                                taskId: task.id,
-                                taskType: task.type,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Next reminder ${_formatReminderTime(task.nextReminderAt)}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FilledButton.icon(
-                                      onPressed: () async {
-                                        await ref
-                                            .read(tasksControllerProvider.notifier)
-                                            .markTaskDone(task);
-                                      },
-                                      icon: const Icon(Icons.check_circle_outline),
-                                      label: const Text('Done'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () async {
-                                        await ref
-                                            .read(tasksControllerProvider.notifier)
-                                            .toggleSnoozeTask(task);
-                                      },
-                                      icon: Icon(
-                                        task.status == TaskReminderStatus.snoozed
-                                            ? Icons.notifications_active_outlined
-                                            : Icons.snooze_outlined,
-                                      ),
-                                      label: Text(
-                                        task.status == TaskReminderStatus.snoozed
-                                            ? 'Unsnooze'
-                                            : 'Snooze',
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton.icon(
-                                  onPressed: () => _showTaskFormSheet(
-                                    context,
-                                    ref,
-                                    existingTask: task,
-                                  ),
-                                  icon: const Icon(Icons.edit_outlined),
-                                  label: const Text('Edit'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(key: ValueKey('collapsed')),
-                ),
-              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(key: ValueKey('collapsed')),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1060,7 +1149,25 @@ class _EmptyTasksState extends StatelessWidget {
   }
 }
 
-bool _shouldShowOnHome(Task task) {
+bool _hasIncompleteLinkedShoppingItems(
+  Task task,
+  List<ShoppingItem> shoppingItems,
+) {
+  if (task.type != TaskType.shopping || task.id == null) {
+    return false;
+  }
+
+  final taskId = task.id.toString();
+  return shoppingItems.any(
+    (item) => item.linkedTaskId == taskId && !item.isCompleted,
+  );
+}
+
+bool _shouldShowOnHome(Task task, List<ShoppingItem> shoppingItems) {
+  if (_hasIncompleteLinkedShoppingItems(task, shoppingItems)) {
+    return true;
+  }
+
   if (task.status == TaskReminderStatus.completed) {
     return false;
   }
@@ -1070,6 +1177,14 @@ bool _shouldShowOnHome(Task task) {
   return date.year == now.year &&
       date.month == now.month &&
       date.day == now.day;
+}
+
+TaskReminderStatus _homeTaskStatus(Task task, List<ShoppingItem> shoppingItems) {
+  if (_hasIncompleteLinkedShoppingItems(task, shoppingItems)) {
+    return TaskReminderStatus.pending;
+  }
+
+  return task.status;
 }
 
 String _slotLabel(TaskSlot slot) {

@@ -33,6 +33,14 @@ class ShoppingService {
     return createdSession;
   }
 
+  Future<List<ShoppingSession>> getSessionsWithResolvedStatus() async {
+    final sessions = await _shoppingRepository.getSessions();
+    for (final session in sessions) {
+      await _resolveCompletionStatusForDueSession(session);
+    }
+    return _shoppingRepository.getSessions();
+  }
+
   Future<ShoppingItem> addItem(ShoppingItem item) {
     final normalized = _normalizeItem(item);
     final itemWithId = normalized.id.isEmpty
@@ -148,6 +156,8 @@ class ShoppingService {
     if (updatedItem.linkedTaskId != null) {
       await syncLinkedTaskReminder(updatedItem.linkedTaskId!);
     }
+
+    await _resolveCompletionStatusBySessionId(updatedItem.sessionId);
   }
 
   Future<void> setCompleted(ShoppingItem item, bool completed) async {
@@ -164,6 +174,8 @@ class ShoppingService {
     if (updatedItem.linkedTaskId != null) {
       await syncLinkedTaskReminder(updatedItem.linkedTaskId!);
     }
+
+    await _resolveCompletionStatusBySessionId(updatedItem.sessionId);
   }
 
   Future<void> deleteItem(String itemId) async {
@@ -178,6 +190,12 @@ class ShoppingService {
     final session = await _shoppingRepository.getSessionById(sessionId);
     if (session == null) {
       return;
+    }
+
+    if (session.status == ShoppingSessionStatus.active) {
+      throw StateError(
+        'Cannot delete an active shopping list. Complete it first.',
+      );
     }
 
     final itemCount = (await _shoppingRepository.getItemsBySession(sessionId)).length;
@@ -230,9 +248,14 @@ class ShoppingService {
   }
 
   ShoppingItem _normalizeItem(ShoppingItem item) {
+    final normalizedPrice = item.pricePerItem;
     return item.copyWith(
       name: item.name.trim(),
       category: item.category.trim().isEmpty ? 'General' : item.category.trim(),
+      quantity: item.quantity < 1 ? 1 : item.quantity,
+      pricePerItem: normalizedPrice == null
+          ? null
+          : (normalizedPrice < 0 ? 0 : normalizedPrice),
       linkedTaskId: item.linkedTaskId?.trim().isEmpty == true
           ? null
           : item.linkedTaskId?.trim(),
@@ -291,6 +314,49 @@ class ShoppingService {
     if (duplicate != null) {
       throw StateError('Duplicate shopping item in session.');
     }
+  }
+
+  Future<void> _resolveCompletionStatusBySessionId(String? sessionId) async {
+    if (sessionId == null) {
+      return;
+    }
+    final session = await _shoppingRepository.getSessionById(sessionId);
+    if (session == null) {
+      return;
+    }
+    await _resolveCompletionStatusForDueSession(session);
+  }
+
+  Future<void> _resolveCompletionStatusForDueSession(
+    ShoppingSession session,
+  ) async {
+    if (session.status == ShoppingSessionStatus.completed) {
+      return;
+    }
+
+    final today = _dateOnly(_now());
+    final sessionDate = _dateOnly(session.date);
+    if (sessionDate.isAfter(today)) {
+      return;
+    }
+
+    final items = await _shoppingRepository.getItemsBySession(session.id);
+    if (items.isEmpty) {
+      return;
+    }
+
+    final allCompleted = items.every((item) => item.isCompleted);
+    if (!allCompleted) {
+      return;
+    }
+
+    await _shoppingRepository.updateSession(
+      session.copyWith(status: ShoppingSessionStatus.completed),
+    );
+  }
+
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
   }
 
   bool _isSameShoppingItem(ShoppingItem left, ShoppingItem right) {

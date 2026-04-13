@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
-import '../../../shopping/domain/entities/shopping_session.dart';
-import '../../../shopping/presentation/pages/shopping_list_screen.dart';
-import '../../../shopping/presentation/providers/shopping_providers.dart';
+import '../../../shopping/presentation/pages/shopping_lists_page.dart';
 import '../../domain/entities/task.dart';
 import '../pages/stats_page.dart';
 import '../pages/task_calendar_page.dart';
@@ -27,7 +25,6 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
   @override
   Widget build(BuildContext context) {
     final tasksState = ref.watch(tasksControllerProvider);
-    final shoppingSessionsState = ref.watch(shoppingSessionsProvider);
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
 
@@ -77,13 +74,9 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
                 onTap: () => _openStats(context),
               ),
               const SizedBox(height: 4),
-              _ShoppingListsSection(
-                sessionsState: shoppingSessionsState,
-                onOpenSession: (sessionId) {
-                  _openShoppingList(context, sessionId: sessionId);
-                },
-                onCreateSession: () => _createShoppingSession(context),
-              ),
+              _ShoppingListsSection(onOpenShoppingLists: () {
+                _openShoppingLists(context);
+              }),
               const SizedBox(height: 16),
               _DataToolsCard(
                 onExport: () =>
@@ -131,89 +124,20 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
     ).push(MaterialPageRoute<void>(builder: (_) => const StatsPage()));
   }
 
-  Future<void> _createShoppingSession(BuildContext context) async {
-    final title = await _showCreateShoppingListDialog(context);
-    if (!mounted || title == null) {
-      return;
-    }
-
-    final created = await ref
-        .read(shoppingItemsControllerProvider.notifier)
-        .createSession(DateUtils.dateOnly(DateTime.now()), title);
-
-    if (!mounted) {
-      return;
-    }
-
-    _openShoppingList(context, sessionId: created.id);
-  }
-
-  void _openShoppingList(BuildContext context, {String? sessionId}) {
+  void _openShoppingLists(BuildContext context) {
     Navigator.of(context).pop();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ShoppingListScreen(initialSessionId: sessionId),
+        builder: (_) => const ShoppingListsPage(),
       ),
     );
-  }
-
-  Future<String?> _showCreateShoppingListDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    try {
-      return showDialog<String>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('New shopping list'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'List name',
-                hintText: 'Weekend groceries',
-              ),
-              onSubmitted: (_) {
-                final value = controller.text.trim();
-                Navigator.of(
-                  dialogContext,
-                ).pop(value.isEmpty ? 'Shopping List' : value);
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final value = controller.text.trim();
-                  Navigator.of(
-                    dialogContext,
-                  ).pop(value.isEmpty ? 'Shopping List' : value);
-                },
-                child: const Text('Create'),
-              ),
-            ],
-          );
-        },
-      );
-    } finally {
-      controller.dispose();
-    }
   }
 }
 
 class _ShoppingListsSection extends StatelessWidget {
-  const _ShoppingListsSection({
-    required this.sessionsState,
-    required this.onOpenSession,
-    required this.onCreateSession,
-  });
+  const _ShoppingListsSection({required this.onOpenShoppingLists});
 
-  final AsyncValue<List<ShoppingSession>> sessionsState;
-  final ValueChanged<String> onOpenSession;
-  final VoidCallback onCreateSession;
+  final VoidCallback onOpenShoppingLists;
 
   @override
   Widget build(BuildContext context) {
@@ -237,61 +161,21 @@ class _ShoppingListsSection extends StatelessWidget {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: onCreateSession,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('New'),
+                  onPressed: onOpenShoppingLists,
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Open'),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Open any list or create a new one.',
+              'Manage shopping lists in a dedicated page.',
               style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 12),
-            sessionsState.when(
-              data: (sessions) {
-                if (sessions.isEmpty) {
-                  return const Text('No shopping lists yet.');
-                }
-
-                return Column(
-                  children: [
-                    for (final session in sessions)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          session.status == ShoppingSessionStatus.completed
-                              ? Icons.checklist_rounded
-                              : Icons.list_alt_rounded,
-                        ),
-                        title: Text(session.title),
-                        subtitle: Text(_shoppingSessionSubtitle(session)),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => onOpenSession(session.id),
-                      ),
-                  ],
-                );
-              },
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: LinearProgressIndicator(),
-              ),
-              error: (error, _) => Text('Shopping lists unavailable: $error'),
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _shoppingSessionSubtitle(ShoppingSession session) {
-    final date = DateUtils.dateOnly(session.date.toLocal());
-    final status = switch (session.status) {
-      ShoppingSessionStatus.active => 'Active',
-      ShoppingSessionStatus.completed => 'Completed',
-    };
-    return '$status · ${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AddItemInput extends StatefulWidget {
   const AddItemInput({
@@ -8,7 +9,12 @@ class AddItemInput extends StatefulWidget {
     this.enabled = true,
   });
 
-  final Future<void> Function(String name, String category) onAdd;
+  final Future<void> Function(
+    String name,
+    String category,
+    int quantity,
+    double? pricePerItem,
+  ) onAdd;
   final List<String> categoryOptions;
   final bool enabled;
 
@@ -17,13 +23,19 @@ class AddItemInput extends StatefulWidget {
 }
 
 class _AddItemInputState extends State<AddItemInput> {
-  final TextEditingController _controller = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _quantityController = TextEditingController(
+    text: '1',
+  );
+  final TextEditingController _priceController = TextEditingController();
   String _selectedCategory = 'General';
   bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _nameController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -39,32 +51,65 @@ class _AddItemInputState extends State<AddItemInput> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Quick add',
+              'Add item details',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Type an item and press add. Category defaults to General.',
+              'Capture name, quantity, and price per item in one step.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _nameController,
+              enabled: widget.enabled && !_isSubmitting,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Item',
+                hintText: 'Milk, eggs, coffee...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _controller,
+                    controller: _quantityController,
                     enabled: widget.enabled && !_isSubmitting,
-                    textInputAction: TextInputAction.done,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: const InputDecoration(
-                      labelText: 'Item',
-                      hintText: 'Milk, eggs, coffee...',
+                      labelText: 'Quantity',
+                      hintText: '1',
                       border: OutlineInputBorder(),
                     ),
-                    onSubmitted: (_) => _submit(),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _priceController,
+                    enabled: widget.enabled && !_isSubmitting,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Price / item',
+                      hintText: '0.00',
+                      prefixText: '\$',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
                 PopupMenuButton<String>(
                   enabled: widget.enabled && !_isSubmitting,
                   initialValue: _selectedCategory,
@@ -88,7 +133,7 @@ class _AddItemInputState extends State<AddItemInput> {
                     onPressed: null,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 FilledButton.icon(
                   onPressed: widget.enabled && !_isSubmitting ? _submit : null,
                   icon: _isSubmitting
@@ -98,7 +143,7 @@ class _AddItemInputState extends State<AddItemInput> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.add_rounded),
-                  label: const Text('Add'),
+                  label: const Text('Add item'),
                 ),
               ],
             ),
@@ -109,15 +154,27 @@ class _AddItemInputState extends State<AddItemInput> {
   }
 
   Future<void> _submit() async {
-    final name = _controller.text.trim();
+    final name = _nameController.text.trim();
     if (name.isEmpty || _isSubmitting) {
       return;
     }
 
+    final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
+    final parsedPrice = double.tryParse(_priceController.text.trim());
+    final pricePerItem =
+        (parsedPrice != null && parsedPrice >= 0) ? parsedPrice : null;
+
     setState(() => _isSubmitting = true);
     try {
-      await widget.onAdd(name, _selectedCategory);
-      _controller.clear();
+      await widget.onAdd(
+        name,
+        _selectedCategory,
+        quantity < 1 ? 1 : quantity,
+        pricePerItem,
+      );
+      _nameController.clear();
+      _quantityController.text = '1';
+      _priceController.clear();
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);

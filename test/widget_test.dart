@@ -17,6 +17,8 @@ import 'package:taska/core/rewards/services/reward_engine.dart';
 import 'package:taska/core/settings/app_settings.dart';
 import 'package:taska/core/settings/app_settings_providers.dart';
 import 'package:taska/core/settings/app_settings_storage.dart';
+import 'package:taska/features/shopping/domain/entities/shopping_item.dart';
+import 'package:taska/features/shopping/presentation/providers/shopping_providers.dart';
 import 'package:taska/features/tasks/domain/entities/task.dart';
 import 'package:taska/features/tasks/domain/entities/task_log.dart';
 import 'package:taska/features/tasks/domain/repositories/tasks_repository.dart';
@@ -122,6 +124,55 @@ void main() {
 
     final tasks = await repository.getTasks();
     expect(tasks.map((task) => task.title), contains('Morning review'));
+  });
+
+  testWidgets('shopping tasks stay visible until linked items are done', (
+    WidgetTester tester,
+  ) async {
+    final tasks = [
+      _demoTask(
+        id: 7,
+        title: 'Weekend groceries',
+        slot: TaskSlot.morning,
+        status: TaskReminderStatus.completed,
+        nextReminderAt: DateTime(2026, 4, 1, 8),
+        type: TaskType.shopping,
+      ),
+    ];
+    final repository = _FakeTasksRepository(tasks: tasks);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tasksControllerProvider.overrideWith(
+            () => _FakeTasksController(tasks),
+          ),
+          shoppingItemsControllerProvider.overrideWith(
+            () => _FakeShoppingItemsController([
+              ShoppingItem(
+                id: 'item-1',
+                name: 'Milk',
+                category: 'Groceries',
+                isCompleted: false,
+                linkedTaskId: '7',
+                createdAt: DateTime(2026, 3, 31, 9),
+              ),
+            ]),
+          ),
+          appSettingsStorageProvider.overrideWithValue(_FakeSettingsStorage()),
+          notificationServiceProvider.overrideWithValue(
+            _FakeNotificationService(),
+          ),
+        ],
+        child: const MaterialApp(
+          home: TasksPage(embedded: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Weekend groceries'), findsOneWidget);
+    expect(find.text('pending'), findsOneWidget);
   });
 
   testWidgets('dashboard add task form shows editable date field', (
@@ -333,6 +384,24 @@ class _FakeTasksRepository implements TasksRepository {
   }
 }
 
+class _FakeTasksController extends TasksController {
+  _FakeTasksController(this.tasks);
+
+  final List<Task> tasks;
+
+  @override
+  Future<List<Task>> build() async => tasks;
+}
+
+class _FakeShoppingItemsController extends ShoppingItemsController {
+  _FakeShoppingItemsController(this.items);
+
+  final List<ShoppingItem> items;
+
+  @override
+  Future<List<ShoppingItem>> build() async => items;
+}
+
 class _FakeSettingsStorage extends AppSettingsStorage {
   AppSettings? savedSettings;
 
@@ -405,18 +474,21 @@ Task _demoTask({
   required String title,
   required TaskSlot slot,
   required TaskReminderStatus status,
+  TaskType type = TaskType.normal,
+  DateTime? nextReminderAt,
 }) {
   return Task(
     id: id,
     title: title,
     notes: null,
     timeLabel: '08:00',
+    type: type,
     slot: slot,
     repeat: TaskRepeat.none,
     status: status,
     createdAt: DateTime(2026, 3, 20, 8),
     updatedAt: DateTime(2026, 3, 20, 8),
-    nextReminderAt: DateTime(2026, 3, 20, 8),
+    nextReminderAt: nextReminderAt ?? DateTime(2026, 3, 20, 8),
     reminderIntervalMinutes: 180,
     reminderIntensity: TaskReminderIntensity.normal,
     ignoredCount: 0,

@@ -3,7 +3,7 @@ import 'package:sqflite/sqflite.dart';
 class DatabaseSchema {
   const DatabaseSchema._();
 
-  static const version = 10;
+  static const version = 11;
 
   static Future<void> onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
@@ -104,6 +104,13 @@ class DatabaseSchema {
     if (oldVersion < 10) {
       await _recreateShoppingItemsTableWithSessionLink(db);
     }
+
+    if (oldVersion < 11) {
+      await db.execute(
+        'ALTER TABLE shopping_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1',
+      );
+      await db.execute('ALTER TABLE shopping_items ADD COLUMN unit_price REAL');
+    }
   }
 
   static Future<void> _createShoppingItemsTable(DatabaseExecutor db) async {
@@ -112,6 +119,8 @@ class DatabaseSchema {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         category TEXT,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        unit_price REAL,
         is_completed INTEGER DEFAULT 0,
         linked_task_id TEXT,
         session_id TEXT,
@@ -146,6 +155,8 @@ class DatabaseSchema {
           id,
           name,
           category,
+          quantity,
+          unit_price,
           is_completed,
           linked_task_id,
           session_id,
@@ -155,6 +166,8 @@ class DatabaseSchema {
           id,
           name,
           category,
+          1,
+          NULL,
           is_completed,
           linked_task_id,
           NULL,

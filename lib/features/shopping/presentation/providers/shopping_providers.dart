@@ -13,7 +13,7 @@ final shoppingItemsControllerProvider =
     );
 
 final shoppingSessionsProvider = FutureProvider<List<ShoppingSession>>((ref) {
-  return ref.watch(shoppingRepositoryProvider).getSessions();
+  return ref.watch(shoppingServiceProvider).getSessionsWithResolvedStatus();
 });
 
 final shoppingSuggestionsProvider = FutureProvider<List<ShoppingItem>>((ref) {
@@ -57,6 +57,8 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
   Future<void> addItem({
     required String name,
     String category = 'General',
+    int quantity = 1,
+    double? pricePerItem,
     String? linkedTaskId,
     String? sessionId,
   }) async {
@@ -72,6 +74,10 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
             id: '',
             name: trimmedName,
             category: category.trim().isEmpty ? 'General' : category.trim(),
+            quantity: quantity < 1 ? 1 : quantity,
+            pricePerItem: (pricePerItem != null && pricePerItem >= 0)
+              ? pricePerItem
+              : null,
             isCompleted: false,
             linkedTaskId: linkedTaskId,
             sessionId: sessionId,
@@ -89,6 +95,8 @@ class ShoppingItemsController extends AsyncNotifier<List<ShoppingItem>>
     await addItem(
       name: suggestion.name,
       category: suggestion.category,
+      quantity: suggestion.quantity,
+      pricePerItem: suggestion.pricePerItem,
       linkedTaskId: suggestion.linkedTaskId,
       sessionId: sessionId,
     );
