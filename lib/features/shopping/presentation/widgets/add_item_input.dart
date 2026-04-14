@@ -6,6 +6,7 @@ class AddItemInput extends StatefulWidget {
     super.key,
     required this.onAdd,
     required this.categoryOptions,
+    this.currencySymbol = '\$',
     this.enabled = true,
   });
 
@@ -16,6 +17,7 @@ class AddItemInput extends StatefulWidget {
     double? pricePerItem,
   ) onAdd;
   final List<String> categoryOptions;
+  final String currencySymbol;
   final bool enabled;
 
   @override
@@ -83,9 +85,10 @@ class _AddItemInputState extends State<AddItemInput> {
                       labelText: 'Quantity',
                       hintText: '1',
                       border: OutlineInputBorder(),
-                    ),
+                      decoration: InputDecoration(
                   ),
                 ),
+                        prefixText: widget.currencySymbol,
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -100,7 +103,6 @@ class _AddItemInputState extends State<AddItemInput> {
                     decoration: const InputDecoration(
                       labelText: 'Price / item',
                       hintText: '0.00',
-                      prefixText: '\$',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -146,6 +148,11 @@ class _AddItemInputState extends State<AddItemInput> {
                   label: const Text('Add item'),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Prices use ${widget.currencySymbol.trim()} as selected in Settings.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),

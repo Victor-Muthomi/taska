@@ -198,9 +198,9 @@ class ShoppingService {
       );
     }
 
-    final itemCount = (await _shoppingRepository.getItemsBySession(sessionId)).length;
-    if (itemCount > 0) {
-      throw StateError('Cannot delete a shopping session that still has items.');
+    final sessionItems = await _shoppingRepository.getItemsBySession(sessionId);
+    for (final item in sessionItems) {
+      await deleteItem(item.id);
     }
 
     await _shoppingRepository.deleteSession(sessionId);

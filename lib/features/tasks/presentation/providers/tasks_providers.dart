@@ -247,6 +247,18 @@ class TasksController extends AsyncNotifier<List<Task>> {
   }
 
   Future<void> delete(int taskId) async {
+    final tasks = await ref.read(getTasksUseCaseProvider).call();
+    final task = tasks.cast<Task?>().firstWhere(
+      (candidate) => candidate?.id == taskId,
+      orElse: () => null,
+    );
+    if (task == null) {
+      return;
+    }
+    if (task.status != TaskReminderStatus.completed) {
+      throw StateError('Only tasks marked done can be deleted.');
+    }
+
     await ref
         .read(logTaskActionUseCaseProvider)
         .call(

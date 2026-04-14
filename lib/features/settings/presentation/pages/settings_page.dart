@@ -43,6 +43,31 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
+              title: const Text('Currency'),
+              subtitle: Text(settings.currency.label),
+              trailing: DropdownButton<AppCurrency>(
+                value: settings.currency,
+                underline: const SizedBox.shrink(),
+                items: AppCurrency.values
+                    .map(
+                      (currency) => DropdownMenuItem(
+                        value: currency,
+                        child: Text(currency.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  ref.read(appSettingsProvider.notifier).updateCurrency(value);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
               title: const Text('Default snooze duration'),
               subtitle: Text('${settings.defaultSnoozeMinutes} minutes'),
               trailing: DropdownButton<int>(

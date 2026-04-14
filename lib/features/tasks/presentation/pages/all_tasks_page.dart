@@ -189,75 +189,148 @@ class _AllTaskCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => TasksPage.showTaskFormSheet(
-          context,
-          ref: ref,
-          existingTask: task,
+    return Dismissible(
+      key: ValueKey('all-task-${task.id ?? task.title}-${task.nextReminderAt.toIso8601String()}'),
+      direction: DismissDirection.startToEnd,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          task.title,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _TaskMetaChip(icon: Icons.schedule_outlined, label: task.timeLabel),
-                            _TaskMetaChip(icon: Icons.repeat_rounded, label: _repeatLabel(task.repeat)),
-                            _TaskMetaChip(icon: Icons.notifications_active_outlined, label: _statusLabel(task.status)),
-                            if (task.type == TaskType.shopping)
-                              const _TaskMetaChip(
-                                icon: Icons.shopping_cart_outlined,
-                                label: 'Shopping',
-                              ),
-                            _TaskMetaChip(icon: Icons.wb_sunny_outlined, label: _slotLabel(task.slot)),
-                          ],
-                        ),
-                      ],
+        child: Icon(
+          Icons.delete_outline,
+          color: Theme.of(context).colorScheme.onErrorContainer,
+        ),
+      ),
+      confirmDismiss: (_) async {
+        final taskId = task.id;
+        if (taskId == null) {
+          return false;
+        }
+
+        if (task.status != TaskReminderStatus.completed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Only tasks marked done can be deleted.'),
+            ),
+          );
+          return false;
+        }
+
+        final shouldDelete =
+            await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) {
+                return AlertDialog(
+                  title: const Text('Delete task'),
+                  content: Text('Delete "${task.title}"?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                      child: const Text('Cancel'),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => TasksPage.showTaskFormSheet(
-                      context,
-                      ref: ref,
-                      existingTask: task,
+                    FilledButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      child: const Text('Delete'),
                     ),
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Edit task',
+                  ],
+                );
+              },
+            ) ??
+            false;
+
+        if (!shouldDelete) {
+          return false;
+        }
+
+        try {
+          await ref.read(tasksControllerProvider.notifier).delete(taskId);
+          return true;
+        } catch (error) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$error')));
+          return false;
+        }
+      },
+      onDismissed: (_) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Deleted "${task.title}"')));
+      },
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => TasksPage.showTaskFormSheet(
+            context,
+            ref: ref,
+            existingTask: task,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            task.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _TaskMetaChip(icon: Icons.schedule_outlined, label: task.timeLabel),
+                              _TaskMetaChip(icon: Icons.repeat_rounded, label: _repeatLabel(task.repeat)),
+                              _TaskMetaChip(icon: Icons.notifications_active_outlined, label: _statusLabel(task.status)),
+                              if (task.type == TaskType.shopping)
+                                const _TaskMetaChip(
+                                  icon: Icons.shopping_cart_outlined,
+                                  label: 'Shopping',
+                                ),
+                              _TaskMetaChip(icon: Icons.wb_sunny_outlined, label: _slotLabel(task.slot)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => TasksPage.showTaskFormSheet(
+                        context,
+                        ref: ref,
+                        existingTask: task,
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: 'Edit task',
+                    ),
+                  ],
+                ),
+                if (task.notes != null && task.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    task.notes!,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
-              ),
-              if (task.notes != null && task.notes!.isNotEmpty) ...[
+                ShoppingTaskItemsPreview(taskId: task.id, taskType: task.type),
                 const SizedBox(height: 10),
                 Text(
-                  task.notes!,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  'Updated ${_formatDateTime(task.updatedAt)} · Next reminder ${_formatDateTime(task.nextReminderAt)}',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
-              ShoppingTaskItemsPreview(taskId: task.id, taskType: task.type),
-              const SizedBox(height: 10),
-              Text(
-                'Updated ${_formatDateTime(task.updatedAt)} · Next reminder ${_formatDateTime(task.nextReminderAt)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -25,6 +25,7 @@ class AppSettingsStorage {
       final map = jsonDecode(raw) as Map<String, dynamic>;
       return AppSettings(
         themeMode: _themeModeFromName(map['themeMode'] as String?),
+        currency: _currencyFromName(map['currency'] as String?),
         defaultSnoozeMinutes:
             (map['defaultSnoozeMinutes'] as num?)?.toInt() ?? 10,
         preferredReminderIntensity: _intensityFromName(
@@ -49,6 +50,7 @@ class AppSettingsStorage {
     await file.writeAsString(
       jsonEncode({
         'themeMode': settings.themeMode.name,
+        'currency': settings.currency.name,
         'defaultSnoozeMinutes': settings.defaultSnoozeMinutes,
         'preferredReminderIntensity': settings.preferredReminderIntensity.name,
         'preferredNotificationPriority':
@@ -77,6 +79,15 @@ class AppSettingsStorage {
       'dark' => ThemeMode.dark,
       'system' => ThemeMode.system,
       _ => ThemeMode.light,
+    };
+  }
+
+  AppCurrency _currencyFromName(String? value) {
+    return switch (value) {
+      'eur' => AppCurrency.eur,
+      'gbp' => AppCurrency.gbp,
+      'kes' => AppCurrency.kes,
+      _ => AppCurrency.usd,
     };
   }
 

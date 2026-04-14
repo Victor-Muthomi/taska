@@ -39,6 +39,10 @@ class AppSettingsController extends Notifier<AppSettings> {
     await _save(state.copyWith(themeMode: themeMode));
   }
 
+  Future<void> updateCurrency(AppCurrency currency) async {
+    await _save(state.copyWith(currency: currency));
+  }
+
   Future<void> updateDefaultSnoozeMinutes(int minutes) async {
     await _save(state.copyWith(defaultSnoozeMinutes: minutes));
   }

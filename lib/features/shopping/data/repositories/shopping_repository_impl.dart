@@ -56,12 +56,8 @@ class ShoppingRepositoryImpl implements ShoppingRepository {
   }
 
   @override
-  Future<void> deleteSession(String id) async {
-    final itemCount = await _localDataSource.countItemsBySessionId(id);
-    if (itemCount > 0) {
-      throw StateError('Cannot delete a shopping session that still has items.');
-    }
-    await _localDataSource.deleteSession(id);
+  Future<void> deleteSession(String id) {
+    return _localDataSource.deleteSession(id);
   }
 
   @override

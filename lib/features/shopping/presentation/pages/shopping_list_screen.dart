@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/shopping/shopping_service_providers.dart';
+import '../../../../core/settings/app_settings_providers.dart';
 import '../../domain/entities/shopping_item.dart';
 import '../../domain/entities/shopping_session.dart';
 import '../providers/shopping_providers.dart';
@@ -119,6 +120,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(appSettingsProvider);
     ref.watch(shoppingItemsControllerProvider);
     final sessionsState = ref.watch(shoppingSessionsProvider);
     final suggestionsState = ref.watch(shoppingSuggestionsProvider);
@@ -229,6 +231,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               const SizedBox(height: 16),
               AddItemInput(
                 categoryOptions: categories,
+                currencySymbol: settings.currency.symbol,
                 onAdd: (name, category, quantity, pricePerItem) {
                   return controller.addItem(
                     name: name,
@@ -241,6 +244,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               ),
               const SizedBox(height: 12),
               _CostSummaryCard(
+                currencySymbol: settings.currency.symbol,
                 totalCost: totalCost,
                 remainingCost: remainingCost,
               ),
@@ -262,6 +266,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 for (final category in categories)
                   _CategorySection(
                     category: category,
+                    currencySymbol: settings.currency.symbol,
                     items: items
                         .where(
                           (item) => _categoryLabel(item.category) == category,
@@ -370,10 +375,12 @@ class _SessionSwitcherCard extends StatelessWidget {
 
 class _CostSummaryCard extends StatelessWidget {
   const _CostSummaryCard({
+    required this.currencySymbol,
     required this.totalCost,
     required this.remainingCost,
   });
 
+  final String currencySymbol;
   final double totalCost;
   final double remainingCost;
 
@@ -391,12 +398,12 @@ class _CostSummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Total: \$${totalCost.toStringAsFixed(2)}',
+              'Total: ${_formatCurrency(currencySymbol, totalCost)}',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 4),
             Text(
-              'Remaining (unchecked): \$${remainingCost.toStringAsFixed(2)}',
+              'Remaining (unchecked): ${_formatCurrency(currencySymbol, remainingCost)}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -477,10 +484,15 @@ class _SessionHeader extends StatelessWidget {
 }
 
 class _CategorySection extends StatelessWidget {
-  const _CategorySection({required this.category, required this.items});
+  const _CategorySection({
+    required this.category,
+    required this.items,
+    required this.currencySymbol,
+  });
 
   final String category;
   final List<ShoppingItem> items;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context) {
@@ -502,7 +514,8 @@ class _CategorySection extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            for (final item in items) _ShoppingItemTile(item: item),
+            for (final item in items)
+              _ShoppingItemTile(item: item, currencySymbol: currencySymbol),
           ],
         ),
       ),
@@ -511,9 +524,10 @@ class _CategorySection extends StatelessWidget {
 }
 
 class _ShoppingItemTile extends ConsumerWidget {
-  const _ShoppingItemTile({required this.item});
+  const _ShoppingItemTile({required this.item, required this.currencySymbol});
 
   final ShoppingItem item;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -522,7 +536,7 @@ class _ShoppingItemTile extends ConsumerWidget {
     final meta = <String>['Qty ${item.quantity}', item.category];
     if (hasPrice) {
       meta.add(
-        '\$${item.pricePerItem!.toStringAsFixed(2)} each · \$${total!.toStringAsFixed(2)} total',
+        '${_formatCurrency(currencySymbol, item.pricePerItem!)} each · ${_formatCurrency(currencySymbol, total!)} total',
       );
     }
 
@@ -574,6 +588,10 @@ class _ShoppingItemTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _formatCurrency(String symbol, double amount) {
+  return '$symbol${amount.toStringAsFixed(2)}';
 }
 
 class _EmptyShoppingState extends StatelessWidget {

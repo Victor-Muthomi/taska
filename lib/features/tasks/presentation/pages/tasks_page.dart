@@ -872,211 +872,155 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
   Widget build(BuildContext context) {
     final task = widget.task;
     final displayStatus = _homeTaskStatus(task, widget.shoppingItems);
-    final taskId = task.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Dismissible(
-        key: ValueKey('task-${task.id ?? task.title}-${task.nextReminderAt.toIso8601String()}'),
-        direction: DismissDirection.startToEnd,
-        background: Container(
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.errorContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            Icons.delete_outline,
-            color: Theme.of(context).colorScheme.onErrorContainer,
-          ),
-        ),
-        confirmDismiss: (_) async {
-          if (taskId == null) {
-            return false;
-          }
-
-          final shouldDelete =
-              await showDialog<bool>(
-                context: context,
-                builder: (dialogContext) {
-                  return AlertDialog(
-                    title: const Text('Delete task'),
-                    content: Text('Delete "${task.title}"?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(false),
-                        child: const Text('Cancel'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(true),
-                        child: const Text('Delete'),
-                      ),
-                    ],
-                  );
-                },
-              ) ??
-              false;
-
-          if (!shouldDelete) {
-            return false;
-          }
-
-          await ref.read(tasksControllerProvider.notifier).delete(taskId);
-          return true;
-        },
-        onDismissed: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Deleted "${task.title}"')),
-          );
-        },
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              task.title,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _MetaChip(
-                                  icon: Icons.schedule_outlined,
-                                  label: task.timeLabel,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            task.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _MetaChip(
+                                icon: Icons.schedule_outlined,
+                                label: task.timeLabel,
+                              ),
+                              _MetaChip(
+                                icon: Icons.notifications_active_outlined,
+                                label: _statusLabel(displayStatus),
+                              ),
+                              if (task.type == TaskType.shopping)
+                                const _MetaChip(
+                                  icon: Icons.shopping_cart_outlined,
+                                  label: 'Shopping',
                                 ),
-                                _MetaChip(
-                                  icon: Icons.notifications_active_outlined,
-                                  label: _statusLabel(displayStatus),
-                                ),
-                                if (task.type == TaskType.shopping)
-                                  const _MetaChip(
-                                    icon: Icons.shopping_cart_outlined,
-                                    label: 'Shopping',
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _expanded
+                      ? Padding(
+                          key: const ValueKey('expanded'),
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _MetaChip(
+                                    icon: Icons.wb_sunny_outlined,
+                                    label:
+                                        '${_slotLabel(task.slot)} ${_slotWindowLabel(task.slot)}',
                                   ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        _expanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: _expanded
-                        ? Padding(
-                            key: const ValueKey('expanded'),
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    _MetaChip(
-                                      icon: Icons.wb_sunny_outlined,
-                                      label:
-                                          '${_slotLabel(task.slot)} ${_slotWindowLabel(task.slot)}',
-                                    ),
-                                    _MetaChip(
-                                      icon: Icons.repeat_rounded,
-                                      label: _repeatLabel(task.repeat),
-                                    ),
-                                  ],
-                                ),
-                                if (task.notes != null && task.notes!.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    task.notes!,
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  _MetaChip(
+                                    icon: Icons.repeat_rounded,
+                                    label: _repeatLabel(task.repeat),
                                   ),
                                 ],
-                                ShoppingTaskItemsPreview(
-                                  taskId: task.id,
-                                  taskType: task.type,
-                                ),
+                              ),
+                              if (task.notes != null && task.notes!.isNotEmpty) ...[
                                 const SizedBox(height: 12),
                                 Text(
-                                  'Next reminder ${_formatReminderTime(task.nextReminderAt)}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: FilledButton.icon(
-                                        onPressed: () async {
-                                          await ref
-                                              .read(tasksControllerProvider.notifier)
-                                              .markTaskDone(task);
-                                        },
-                                        icon: const Icon(Icons.check_circle_outline),
-                                        label: const Text('Done'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () async {
-                                          await ref
-                                              .read(tasksControllerProvider.notifier)
-                                              .toggleSnoozeTask(task);
-                                        },
-                                        icon: Icon(
-                                          task.status == TaskReminderStatus.snoozed
-                                              ? Icons.notifications_active_outlined
-                                              : Icons.snooze_outlined,
-                                        ),
-                                        label: Text(
-                                          task.status == TaskReminderStatus.snoozed
-                                              ? 'Unsnooze'
-                                              : 'Snooze',
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    onPressed: () => _showTaskFormSheet(
-                                      context,
-                                      ref,
-                                      existingTask: task,
-                                    ),
-                                    icon: const Icon(Icons.edit_outlined),
-                                    label: const Text('Edit'),
-                                  ),
+                                  task.notes!,
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               ],
-                            ),
-                          )
-                        : const SizedBox.shrink(key: ValueKey('collapsed')),
-                  ),
-                ],
-              ),
+                              ShoppingTaskItemsPreview(
+                                taskId: task.id,
+                                taskType: task.type,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Next reminder ${_formatReminderTime(task.nextReminderAt)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: () async {
+                                        await ref
+                                            .read(tasksControllerProvider.notifier)
+                                            .markTaskDone(task);
+                                      },
+                                      icon: const Icon(Icons.check_circle_outline),
+                                      label: const Text('Done'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await ref
+                                            .read(tasksControllerProvider.notifier)
+                                            .toggleSnoozeTask(task);
+                                      },
+                                      icon: Icon(
+                                        task.status == TaskReminderStatus.snoozed
+                                            ? Icons.notifications_active_outlined
+                                            : Icons.snooze_outlined,
+                                      ),
+                                      label: Text(
+                                        task.status == TaskReminderStatus.snoozed
+                                            ? 'Unsnooze'
+                                            : 'Snooze',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () => _showTaskFormSheet(
+                                    context,
+                                    ref,
+                                    existingTask: task,
+                                  ),
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Edit'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('collapsed')),
+                ),
+              ],
             ),
           ),
         ),
