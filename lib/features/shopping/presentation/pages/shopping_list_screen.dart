@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/shopping/shopping_service_providers.dart';
+import '../../../../core/settings/app_settings.dart';
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../domain/entities/shopping_item.dart';
 import '../../domain/entities/shopping_session.dart';

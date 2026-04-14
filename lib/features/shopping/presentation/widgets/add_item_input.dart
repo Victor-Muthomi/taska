@@ -85,10 +85,9 @@ class _AddItemInputState extends State<AddItemInput> {
                       labelText: 'Quantity',
                       hintText: '1',
                       border: OutlineInputBorder(),
-                      decoration: InputDecoration(
+                    ),
                   ),
                 ),
-                        prefixText: widget.currencySymbol,
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -100,10 +99,11 @@ class _AddItemInputState extends State<AddItemInput> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Price / item',
                       hintText: '0.00',
-                      border: OutlineInputBorder(),
+                      prefixText: widget.currencySymbol,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),

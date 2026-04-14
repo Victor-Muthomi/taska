@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/notifications/notification_channels.dart';
 import '../../../../core/scheduling/slot_schedule.dart';
+import '../../../../core/settings/app_settings.dart';
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
 import '../../../tasks/domain/entities/task.dart';
