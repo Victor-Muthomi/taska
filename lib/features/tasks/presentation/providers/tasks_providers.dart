@@ -7,6 +7,7 @@ import '../../../../core/notifications/notification_providers.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/reminders/reminder_engine_providers.dart';
 import '../../../../core/rewards/reward_providers.dart';
+import '../../../../core/rewards/reward_state_providers.dart';
 import '../../../../core/scheduling/slot_schedule.dart';
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../data/datasources/tasks_local_data_source.dart';
@@ -183,7 +184,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
     );
     await ref.read(tasksRepositoryProvider).updateTask(updatedTask);
     await ref.read(logTaskActionUseCaseProvider).call(completionLog);
-    await ref.read(rewardEngineProvider).refreshFromLogs();
+    await _refreshRewardState();
     if (updatedTask.status == TaskReminderStatus.completed) {
       await ref
           .read(notificationServiceProvider)
@@ -266,7 +267,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
         );
     await ref.read(deleteTaskUseCaseProvider).call(taskId);
     state = AsyncData(await _refreshTasks());
-    await ref.read(rewardEngineProvider).refreshFromLogs();
+    await _refreshRewardState();
   }
 
   Future<void> scheduleReminder(
@@ -293,7 +294,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
               loggedAt: DateTime.now(),
             ),
           );
-      await ref.read(rewardEngineProvider).refreshFromLogs();
+      await _refreshRewardState();
     }
   }
 
@@ -313,7 +314,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
             loggedAt: DateTime.now(),
           ),
         );
-    await ref.read(rewardEngineProvider).refreshFromLogs();
+    await _refreshRewardState();
   }
 
   Future<void> handleNotificationEvent(NotificationEvent event) async {
@@ -337,7 +338,7 @@ class TasksController extends AsyncNotifier<List<Task>> {
                 loggedAt: DateTime.now(),
               ),
             );
-        await ref.read(rewardEngineProvider).refreshFromLogs();
+        await _refreshRewardState();
         break;
       case NotificationEventType.snoozed:
         await snoozeTask(task);
@@ -376,6 +377,12 @@ class TasksController extends AsyncNotifier<List<Task>> {
     await _syncMissedTasks(tasks);
     await _reconcileScheduledReminders();
     return ref.read(getTasksUseCaseProvider).call();
+  }
+
+  Future<void> _refreshRewardState({DateTime? today}) async {
+    await ref.read(rewardEngineProvider).refreshFromLogs(today: today);
+    ref.invalidate(rewardUserStatsProvider);
+    ref.invalidate(rewardAchievementsProvider);
   }
 
   Future<void> _reconcileScheduledReminders() async {

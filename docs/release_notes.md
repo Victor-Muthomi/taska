@@ -1,5 +1,39 @@
 # Taska Release Notes
 
+## Version 3.3 - Roaming Roaster (seasoned)
+
+Release date: 2026-04-19
+
+Taska 3.3 (Roaming Roaster, tag: seasoned) builds on 3.0 by widening daily workflow support and polishing task management across reminders, settings, and shopping flows.
+
+Compared with 3.0, this release adds a dedicated shopping-list experience, stronger reminder preference controls, and smoother in-app navigation between planning and list management.
+
+### Highlights
+
+- Added shopping-list sessions with create, open, and guarded delete flows
+- Added dedicated shopping screens integrated from the task sidebar
+- Expanded settings controls for slot windows, reminder intensity, and notification channel preference
+- Improved theme/settings persistence in the main app flow
+- Continued focus on local-first storage and account-free usage
+
+### Comparison with 3.0
+
+- 3.0 introduced night-slot scheduling and rewards; 3.3 extends the product into shopping-list management
+- 3.0 focused on rewards and scheduling depth; 3.3 focuses on everyday workflow breadth and settings control
+- 3.0 improved stats and achievements; 3.3 improves cross-feature navigation and operational tooling for daily use
+
+### Validation
+
+- Static analysis expected as part of release checks
+- Automated tests expected as part of release checks
+- Android release readiness still depends on real-device notification and alarm validation
+
+### Notes
+
+- Release name: Roaming Roaster
+- Release tag: seasoned
+- Taska stores user data locally on device and does not require an account for core usage.
+
 ## Version 3.0
 
 Release date: 2026-03-25

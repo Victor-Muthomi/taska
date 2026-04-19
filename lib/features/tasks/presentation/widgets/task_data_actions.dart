@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/analytics/behavior_analytics_providers.dart';
 import '../../../../core/export/export_providers.dart';
 import '../../../../core/rewards/reward_providers.dart';
+import '../../../../core/rewards/reward_state_providers.dart';
 import '../../presentation/providers/tasks_providers.dart';
 
 Future<void> exportTasksJson(
@@ -44,6 +45,8 @@ Future<void> importTasksJson(BuildContext context, WidgetRef ref) async {
   ref.invalidate(tasksControllerProvider);
   ref.invalidate(behaviorInsightProvider);
   await ref.read(rewardEngineProvider).refreshFromLogs();
+  ref.invalidate(rewardUserStatsProvider);
+  ref.invalidate(rewardAchievementsProvider);
 
   if (context.mounted) {
     ScaffoldMessenger.of(
@@ -66,6 +69,8 @@ Future<void> restoreLatestBackup(BuildContext context, WidgetRef ref) async {
   ref.invalidate(tasksControllerProvider);
   ref.invalidate(behaviorInsightProvider);
   await ref.read(rewardEngineProvider).refreshFromLogs();
+  ref.invalidate(rewardUserStatsProvider);
+  ref.invalidate(rewardAchievementsProvider);
 
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(

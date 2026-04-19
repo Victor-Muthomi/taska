@@ -1,18 +1,24 @@
 # Taska Play Store Metadata
 
+## Current Release
+
+- Version: 3.3.0+1
+- Release Name: Roaming Roaster
+- Release Tag: seasoned
+
 ## App Name
 
 Taska
 
 ## Short Description
 
-Offline-first smart reminders for real-life time windows.
+Offline-first task, reminder, and shopping list planner for real-life time windows.
 
 ## Full Description
 
 Taska helps you manage tasks by the time windows when you actually plan to do them, not just by one fragile alarm time.
 
-Create tasks for the morning, afternoon, or evening, then let Taska adapt reminders based on your behavior. If you usually finish tasks later in the day, the app learns from that pattern and helps you schedule better.
+Create tasks for morning, afternoon, evening, or night, then let Taska adapt reminders based on your behavior. If you usually finish tasks later in the day, the app learns from that pattern and helps you schedule better.
 
 Taska is designed to stay private and reliable:
 
@@ -23,9 +29,11 @@ Taska is designed to stay private and reliable:
 
 Key features:
 
-- Slot-based scheduling for morning, afternoon, and evening
+- Slot-based scheduling for morning, afternoon, evening, and night
 - Adaptive reminders based on completed, snoozed, and ignored actions
-- Lightweight local analytics
+- Rewards system with streaks, stats, and achievements
+- Shopping lists with dedicated list management screens
+- Lightweight local analytics and progress tracking
 - JSON export and import
 - Dark mode and user-configurable reminder preferences
 
@@ -47,7 +55,7 @@ Taska listens for device reboot events so reminders can be restored after the ph
 
 ### Data and Privacy
 
-Taska stores task data locally on device. It does not require an account for core reminder features and does not depend on a cloud backend for the MVP.
+Taska stores task and shopping data locally on device. It does not require an account for core reminder features and does not depend on a cloud backend.
 
 ## Store Listing Assets Checklist
 
@@ -56,6 +64,7 @@ Taska stores task data locally on device. It does not require an account for cor
 - Phone screenshots:
   - Dashboard
   - Add/Edit Task
+  - Shopping Lists
   - Stats
   - Settings
 - Privacy policy URL if required for chosen distribution setup

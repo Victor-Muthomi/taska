@@ -1,83 +1,64 @@
 # Taska
 
-Taska is an offline-first Flutter app for flexible, slot-based task reminders with rewards, stats, and achievements.
+Taska is an offline-first Flutter app focused on flexible reminders, task tracking, and shopping-list support.
 
-It is designed around a simple idea: most tasks do not belong to one fragile alarm time. They belong to a window of the day. Taska helps you plan around the real flow of your schedule by organizing tasks into morning, afternoon, evening, and night slots, then adapting reminders based on what you complete, snooze, or ignore.
+The app is built around daily time windows (morning, afternoon, evening, night) instead of one fragile alarm timestamp. It keeps data local, adapts reminder behavior from user actions, and adds motivation through rewards and streak tracking.
 
-## Why Taska Exists
+## Current App Scope
 
-Many reminder apps assume you will always act at an exact minute. In practice, that is often the wrong model.
+The current codebase includes:
 
-Taska focuses on:
-
-- Reminder windows instead of one fixed point in time
-- Local, private storage instead of a cloud-first workflow
-- Behavior-aware scheduling that learns from completion and snooze patterns
-- Lightweight planning tools that stay simple enough to use every day
-- Progress feedback through rewards, user stats, and achievements
-
-The result is a task manager that feels practical for real routines: flexible, private, and dependable even when your day shifts around.
-
-## What It Does
-
-- Organizes tasks into clear time windows: morning, afternoon, evening, and night
-- Supports a night slot for late-day tasks and reminders
-- Stores task data locally with SQLite
-- Schedules local notifications for reminder delivery
-- Supports snooze and unsnooze flows, including date selection in the task form
-- Adapts reminder timing and intensity based on user behavior
-- Tracks lightweight analytics such as completion rate and most active time
-- Tracks user stats, streaks, and unlocked achievements
-- Supports dark mode, JSON export/import, backup restore, and local settings persistence
-
-## Core Experience
-
-Taska is built to stay out of your way while still keeping your schedule visible.
-
-You can:
-
-- Add a task to the part of the day where it actually belongs
-- Put late tasks into a dedicated night slot instead of forcing them into evening
-- Let the app remind you locally without needing a server account
-- Snooze tasks when the timing is off, then bring them back when it makes sense
-- Export your data for backup or move it between devices
-- Review basic trends to understand when you are most consistent
-- See reward progress and achievements as you complete tasks
-
-This makes Taska useful for people who want reminders that adapt to life instead of fighting it.
+- Slot-based task planning (morning, afternoon, evening, night)
+- Task snooze/unsnooze flows with date selection support
+- Behavior-aware reminder scheduling and priority escalation options
+- Local notifications and boot-time notification rescheduling on Android
+- Reward engine with stats, streaks, and achievements
+- Shopping lists (create/open/delete list sessions, list item workflows)
+- Theme mode persistence (light/dark)
+- Settings for currency, default snooze duration, reminder intensity, notification preference, and slot window definitions
+- Local export/import and restore actions for task data
 
 ## Tech Stack
 
 - Flutter
-- Riverpod
-- SQLite via `sqflite`
-- `flutter_local_notifications`
-- Local file storage via `path_provider`
+- Dart (SDK constraint: `^3.10.8`)
+- Riverpod (`flutter_riverpod`)
+- SQLite (`sqflite`)
+- Local notifications (`flutter_local_notifications` + `timezone`)
+- Local file and sharing support (`path_provider`, `file_picker`, `share_plus`)
 
 ## Project Structure
 
-The app follows a feature-first layout under [`lib/`](lib/):
+Main source layout under [lib/](lib/):
 
-- `app/`: application shell and bootstrap
-- `core/`: shared services such as database, reminders, notifications, analytics, export, theme, and settings
-- `features/tasks/`: task domain, data layer, and presentation
-- `features/settings/`: user preferences and release-facing settings UI
+- `app/`: app shell and navigation scaffold
+- `core/`: shared infrastructure
+	- `analytics/`, `database/`, `notifications/`, `reminders/`, `rewards/`, `scheduling/`, `settings/`, `shopping/`, `theme/`, `export/`
+- `features/tasks/`: task data, domain, and UI
+- `features/shopping/`: shopping list data, domain, and UI
+- `features/settings/`: settings UI
 
-The repository also includes release support documents under [`docs/`](docs/):
+Release support docs:
 
-- [`docs/release_notes.md`](docs/release_notes.md)
-- [`docs/play_store_metadata.md`](docs/play_store_metadata.md)
-- [`docs/release_checklist.md`](docs/release_checklist.md)
+- [docs/release_notes.md](docs/release_notes.md)
+- [docs/play_store_metadata.md](docs/play_store_metadata.md)
+- [docs/release_checklist.md](docs/release_checklist.md)
 
-The latest release is 3.0, which adds night-slot scheduling and a rewards system with user stats and achievements.
+## Versioning
+
+- App version in [pubspec.yaml](pubspec.yaml): `3.3.0+1`
+- Current documented release line: 3.3
+- Release name: Roaming Roaster
+- Release tag: seasoned
+- Release comparison notes are tracked in [docs/release_notes.md](docs/release_notes.md)
 
 ## Getting Started
 
 ### Prerequisites
 
-- Flutter SDK 3.10+
-- Dart SDK compatible with the Flutter version in this repo
-- Android Studio or the Android SDK command-line tools for Android builds
+- Flutter SDK compatible with Dart `^3.10.8`
+- Android Studio or Android SDK CLI tools for Android builds
+- Xcode for iOS/macOS builds (when building on macOS)
 
 ### Install Dependencies
 
@@ -85,44 +66,45 @@ The latest release is 3.0, which adds night-slot scheduling and a rewards system
 flutter pub get
 ```
 
-### Run the App
+### Run
 
 ```bash
 flutter run
 ```
 
-### Run Quality Checks
+### Quality Checks
 
 ```bash
 flutter analyze
 flutter test
 ```
 
-## Notifications and Permissions
+## Android Notifications and Permissions
 
-Taska uses local notifications and exact alarms for reminder delivery. On Android, the app requests:
+Android manifest permissions configured in [android/app/src/main/AndroidManifest.xml](android/app/src/main/AndroidManifest.xml):
 
-- `POST_NOTIFICATIONS`
-- `SCHEDULE_EXACT_ALARM`
-- `USE_EXACT_ALARM`
-- `RECEIVE_BOOT_COMPLETED`
+- `android.permission.POST_NOTIFICATIONS`
+- `android.permission.SCHEDULE_EXACT_ALARM`
+- `android.permission.USE_EXACT_ALARM`
+- `android.permission.RECEIVE_BOOT_COMPLETED`
+- `android.permission.VIBRATE`
 
-These permissions are configured in [`android/app/src/main/AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml). Device-level validation is still tracked in [`docs/release_checklist.md`](docs/release_checklist.md).
+The manifest also registers notification receivers from `flutter_local_notifications`, including boot/package-replaced handling for scheduled reminders.
 
-## Release Notes
+## Build Notes
 
-- Current release notes are documented in [`docs/release_notes.md`](docs/release_notes.md).
-- Play Store listing copy and permission messaging are documented in [`docs/play_store_metadata.md`](docs/play_store_metadata.md).
-- The release checklist is documented in [`docs/release_checklist.md`](docs/release_checklist.md).
+- Android `release` currently uses debug signing in [android/app/build.gradle.kts](android/app/build.gradle.kts) for local release-mode testing.
+- Java/Kotlin target is configured to 17 in [android/app/build.gradle.kts](android/app/build.gradle.kts).
 
-## Current Status
+## Privacy and Data
 
-Taska is feature-complete for the current 3.0 release and has passing static analysis and automated tests.
+- Core usage is local-first and account-free.
+- Task and related data are persisted on device (SQLite).
 
-The main work still pending before a public release is real-device validation of notification behavior across Android scenarios.
+## Release Tracking
 
-## Notes for Release
+For release details and readiness tracking, use:
 
-- Android currently builds with debug signing for release configuration to simplify local testing.
-- Store listing copy and privacy-oriented messaging are already prepared in the release support docs.
-- The app is designed to keep user data local on device and avoid an account requirement for core reminder features.
+- [docs/release_notes.md](docs/release_notes.md)
+- [docs/play_store_metadata.md](docs/play_store_metadata.md)
+- [docs/release_checklist.md](docs/release_checklist.md)
