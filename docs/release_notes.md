@@ -12,6 +12,7 @@ Compared with 3.0, this release adds a dedicated shopping-list experience, stron
 
 - Added shopping-list sessions with create, open, and guarded delete flows
 - Added dedicated shopping screens integrated from the task sidebar
+- Added a dedicated Clock screen with alarm, timer, and stopwatch services
 - Expanded settings controls for slot windows, reminder intensity, and notification channel preference
 - Improved theme/settings persistence in the main app flow
 - Continued focus on local-first storage and account-free usage

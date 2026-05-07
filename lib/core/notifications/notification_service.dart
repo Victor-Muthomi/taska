@@ -14,6 +14,8 @@ final FlutterLocalNotificationsPlugin _notificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 const int _comebackReminderNotificationId = 9000001;
+const int _clockTimerNotificationId = 9100001;
+const int _clockAlarmNotificationIdBase = 9200000;
 
 @pragma('vm:entry-point')
 Future<void> notificationTapBackground(NotificationResponse response) async {
@@ -147,6 +149,41 @@ class NotificationService {
     return _notificationsPlugin.cancel(taskId);
   }
 
+  Future<void> scheduleClockAlarm({
+    required int alarmId,
+    required DateTime scheduledAt,
+    required String timeLabel,
+  }) async {
+    await _scheduleClockNotification(
+      id: _clockAlarmNotificationIdBase + alarmId,
+      title: 'Taska alarm',
+      body: 'It is $timeLabel.',
+      scheduledAt: scheduledAt,
+      payload: '{"type":"clock_alarm","alarmId":$alarmId}',
+    );
+  }
+
+  Future<void> cancelClockAlarm(int alarmId) {
+    return _notificationsPlugin.cancel(_clockAlarmNotificationIdBase + alarmId);
+  }
+
+  Future<void> scheduleClockTimer({
+    required DateTime scheduledAt,
+    required Duration duration,
+  }) async {
+    await _scheduleClockNotification(
+      id: _clockTimerNotificationId,
+      title: 'Taska timer finished',
+      body: 'Your ${_formatClockDuration(duration)} countdown is complete.',
+      scheduledAt: scheduledAt,
+      payload: '{"type":"clock_timer"}',
+    );
+  }
+
+  Future<void> cancelClockTimer() {
+    return _notificationsPlugin.cancel(_clockTimerNotificationId);
+  }
+
   Future<void> scheduleComebackReminder({required DateTime scheduledAt}) async {
     await cancelComebackReminder();
 
@@ -192,6 +229,36 @@ class NotificationService {
 
   Future<void> cancelComebackReminder() {
     return _notificationsPlugin.cancel(_comebackReminderNotificationId);
+  }
+
+  Future<void> _scheduleClockNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledAt,
+    required String payload,
+  }) async {
+    final scheduledTime = tz.TZDateTime.from(scheduledAt, tz.local);
+    if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
+      await _notificationsPlugin.show(
+        id,
+        title,
+        body,
+        _buildClockNotificationDetails(),
+        payload: payload,
+      );
+      return;
+    }
+
+    await _notificationsPlugin.zonedSchedule(
+      id,
+      title,
+      body,
+      scheduledTime,
+      _buildClockNotificationDetails(),
+      payload: payload,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
   }
 
   Future<void> _onNotificationResponse(NotificationResponse response) async {
@@ -245,6 +312,20 @@ class NotificationService {
   }
 }
 
+NotificationDetails _buildClockNotificationDetails() {
+  return const NotificationDetails(
+    android: AndroidNotificationDetails(
+      'taska_high_priority',
+      'Urgent Reminders',
+      channelDescription:
+          'High priority reminders for tasks that need attention.',
+      importance: Importance.max,
+      priority: Priority.max,
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
+}
+
 NotificationDetails _buildNotificationDetails(
   ReminderPriority priority, {
   required int snoozeMinutes,
@@ -266,4 +347,17 @@ NotificationDetails _buildNotificationDetails(
     ),
     iOS: const DarwinNotificationDetails(),
   );
+}
+
+String _formatClockDuration(Duration duration) {
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+  if (hours > 0) {
+    return '${hours}h ${minutes}m';
+  }
+  if (minutes > 0) {
+    return '${minutes}m';
+  }
+  return '${seconds}s';
 }

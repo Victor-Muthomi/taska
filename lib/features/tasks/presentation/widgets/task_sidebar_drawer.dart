@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/settings/app_settings_providers.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
+import '../../../clock/presentation/pages/clock_services_page.dart';
 import '../../../shopping/presentation/pages/shopping_lists_page.dart';
 import '../../domain/entities/task.dart';
 import '../pages/stats_page.dart';
@@ -74,9 +75,18 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
                 onTap: () => _openStats(context),
               ),
               const SizedBox(height: 4),
-              _ShoppingListsSection(onOpenShoppingLists: () {
-                _openShoppingLists(context);
-              }),
+              ListTile(
+                leading: const Icon(Icons.alarm_outlined),
+                title: const Text('Clock'),
+                subtitle: const Text('Open alarms, timer, and stopwatch'),
+                onTap: () => _openClock(context),
+              ),
+              const SizedBox(height: 4),
+              _ShoppingListsSection(
+                onOpenShoppingLists: () {
+                  _openShoppingLists(context);
+                },
+              ),
               const SizedBox(height: 16),
               _DataToolsCard(
                 onExport: () =>
@@ -124,13 +134,18 @@ class _TaskSidebarDrawerState extends ConsumerState<TaskSidebarDrawer> {
     ).push(MaterialPageRoute<void>(builder: (_) => const StatsPage()));
   }
 
+  void _openClock(BuildContext context) {
+    Navigator.of(context).pop();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ClockServicesPage()));
+  }
+
   void _openShoppingLists(BuildContext context) {
     Navigator.of(context).pop();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const ShoppingListsPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ShoppingListsPage()));
   }
 }
 

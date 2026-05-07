@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/clock/presentation/pages/clock_services_page.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
 import '../features/tasks/presentation/pages/all_tasks_page.dart';
 import '../features/tasks/presentation/pages/stats_page.dart';
@@ -21,6 +22,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
     const pages = [
       TasksPage(embedded: true),
       AllTasksPage(embedded: true),
+      ClockServicesPage(),
       StatsPage(embedded: true),
       SettingsPage(),
     ];
@@ -45,6 +47,11 @@ class _HomeShellPageState extends State<HomeShellPage> {
             icon: Icon(Icons.list_alt_outlined),
             selectedIcon: Icon(Icons.list_alt_rounded),
             label: 'All Tasks',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.alarm_outlined),
+            selectedIcon: Icon(Icons.alarm_rounded),
+            label: 'Clock',
           ),
           NavigationDestination(
             icon: Icon(Icons.query_stats_outlined),

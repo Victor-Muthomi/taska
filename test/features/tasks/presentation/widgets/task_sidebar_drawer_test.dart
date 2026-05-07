@@ -92,6 +92,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Sidebar'), findsOneWidget);
+      expect(find.text('Clock'), findsWidgets);
+      expect(find.text('Open alarms, timer, and stopwatch'), findsOneWidget);
       expect(find.text('Export JSON'), findsOneWidget);
 
       await tester.scrollUntilVisible(
