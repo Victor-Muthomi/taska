@@ -62,9 +62,7 @@ class StoredClockAlarm {
       id: (json['id'] as num?)?.toInt() ?? 0,
       hour: (json['hour'] as num?)?.toInt() ?? 0,
       minute: (json['minute'] as num?)?.toInt() ?? 0,
-      nextRingAtUtcIso:
-          json['nextRingAtUtcIso'] as String? ??
-          DateTime.now().toUtc().toIso8601String(),
+      nextRingAtUtcIso: json['nextRingAtUtcIso'] as String? ?? '',
       enabled: json['enabled'] as bool? ?? true,
     );
   }
