@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/notifications/notification_providers.dart';
+import '../../data/clock_runtime_storage.dart';
+import '../../services/clock_runtime_service.dart';
 
 class ClockServicesPage extends ConsumerStatefulWidget {
   const ClockServicesPage({super.key, this.initialTabIndex = 0});
@@ -16,6 +19,9 @@ class ClockServicesPage extends ConsumerStatefulWidget {
 
 class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     with SingleTickerProviderStateMixin {
+  static const _clockRuntimeStorage = ClockRuntimeStorage();
+  static const _clockRuntimeService = ClockRuntimeService();
+
   late final TabController _tabController;
   Timer? _ticker;
 
@@ -47,6 +53,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       }
       _syncClockState();
     });
+    unawaited(_restoreClockRuntimeState());
   }
 
   @override
@@ -139,6 +146,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       _alarms.sort((a, b) => a.nextRingAt.compareTo(b.nextRingAt));
     });
     _scheduleAlarmNotification(alarm);
+    _persistClockRuntimeState();
   }
 
   void _toggleAlarm(_AlarmEntry alarm, bool enabled) {
@@ -158,6 +166,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
         _cancelAlarmNotification(updatedAlarm);
       }
     });
+    _persistClockRuntimeState();
   }
 
   void _deleteAlarm(_AlarmEntry alarm) {
@@ -165,6 +174,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       _alarms.removeWhere((entry) => entry.id == alarm.id);
     });
     _cancelAlarmNotification(alarm);
+    _persistClockRuntimeState();
   }
 
   void _adjustTimerDuration(Duration delta) {
@@ -177,6 +187,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       _timerDuration = next;
       _timerRemaining = next;
     });
+    _persistClockRuntimeState();
   }
 
   void _toggleTimer() {
@@ -200,6 +211,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
         _scheduleTimerNotification();
       }
     });
+    _persistClockRuntimeState();
   }
 
   void _resetTimer() {
@@ -209,6 +221,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       _timerRemaining = _timerDuration;
     });
     _cancelTimerNotification();
+    _persistClockRuntimeState();
   }
 
   void _toggleStopwatch() {
@@ -282,6 +295,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
 
     if (shouldSetState) {
       setState(() {});
+      _persistClockRuntimeState();
     }
 
     for (final alarm in triggeredAlarms) {
@@ -344,6 +358,108 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
 
   void _cancelTimerNotification() {
     unawaited(ref.read(notificationServiceProvider).cancelClockTimer());
+  }
+
+  Future<void> _restoreClockRuntimeState() async {
+    final state = await _clockRuntimeStorage.load();
+    if (!mounted) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final restoredAlarms = <_AlarmEntry>[];
+    for (final alarm in state.alarms) {
+      if (alarm.id <= 0) {
+        continue;
+      }
+      final time = TimeOfDay(hour: alarm.hour, minute: alarm.minute);
+      var nextRingAt = DateTime.tryParse(alarm.nextRingAtUtcIso)?.toLocal();
+      nextRingAt ??= _nextAlarmDateTime(time);
+      if (alarm.enabled && !nextRingAt.isAfter(now)) {
+        nextRingAt = _nextAlarmDateTime(time);
+      }
+      restoredAlarms.add(
+        _AlarmEntry(
+          id: alarm.id,
+          time: time,
+          nextRingAt: nextRingAt,
+          enabled: alarm.enabled,
+        ),
+      );
+    }
+    restoredAlarms.sort((a, b) => a.nextRingAt.compareTo(b.nextRingAt));
+
+    final restoredTimerDuration = Duration(
+      seconds: state.timerDurationSeconds.clamp(0, 359940).toInt(),
+    );
+    final restoredEndsAtUtc = state.timerEndsAtUtcIso == null
+        ? null
+        : DateTime.tryParse(state.timerEndsAtUtcIso!);
+    final restoredEndsAt = restoredEndsAtUtc?.toLocal();
+    final restoredTimerRemaining = restoredEndsAt == null
+        ? restoredTimerDuration
+        : restoredEndsAt.difference(now);
+    final timerRunning = restoredTimerRemaining > Duration.zero;
+
+    setState(() {
+      _alarms
+        ..clear()
+        ..addAll(restoredAlarms);
+      _nextAlarmId = math.max(
+        state.nextAlarmId,
+        (_alarms.isEmpty
+                ? 0
+                : _alarms.map((alarm) => alarm.id).reduce(math.max)) +
+            1,
+      );
+      _timerDuration = restoredTimerDuration;
+      _timerRemaining = timerRunning ? restoredTimerRemaining : _timerDuration;
+      _timerEndsAt = timerRunning ? restoredEndsAt : null;
+      _timerRunning = timerRunning;
+    });
+
+    for (final alarm in restoredAlarms.where((alarm) => alarm.enabled)) {
+      _scheduleAlarmNotification(alarm);
+    }
+    if (timerRunning && restoredEndsAt != null) {
+      unawaited(
+        ref
+            .read(notificationServiceProvider)
+            .scheduleClockTimer(
+              scheduledAt: restoredEndsAt,
+              duration: restoredTimerRemaining,
+            ),
+      );
+    }
+
+    _persistClockRuntimeState();
+  }
+
+  void _persistClockRuntimeState() {
+    final state = ClockRuntimeState(
+      nextAlarmId: _nextAlarmId,
+      alarms: _alarms
+          .map(
+            (alarm) => StoredClockAlarm(
+              id: alarm.id,
+              hour: alarm.time.hour,
+              minute: alarm.time.minute,
+              nextRingAtUtcIso: alarm.nextRingAt.toUtc().toIso8601String(),
+              enabled: alarm.enabled,
+            ),
+          )
+          .toList(growable: false),
+      timerDurationSeconds: _timerDuration.inSeconds,
+      timerEndsAtUtcIso: _timerRunning
+          ? _timerEndsAt?.toUtc().toIso8601String()
+          : null,
+    );
+    unawaited(_clockRuntimeStorage.save(state));
+    unawaited(
+      (_timerRunning || _alarms.any((alarm) => alarm.enabled))
+          ? _clockRuntimeService.start()
+          : _clockRuntimeService.stop(),
+    );
   }
 }
 

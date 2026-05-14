@@ -91,6 +91,12 @@ Android manifest permissions configured in [android/app/src/main/AndroidManifest
 
 The manifest also registers notification receivers from `flutter_local_notifications`, including boot/package-replaced handling for scheduled reminders.
 
+Clock runtime reliability notes:
+
+- Clock alarms and timer state are persisted locally to survive process death.
+- Android exact alarm scheduling is requested/checked at runtime before scheduling.
+- When clock alarms/timers are active on Android, Taska starts a foreground runtime service to reduce background kill interruptions.
+
 ## Build Notes
 
 - Android `release` currently uses debug signing in [android/app/build.gradle.kts](android/app/build.gradle.kts) for local release-mode testing.

@@ -53,8 +53,31 @@ Future<void> _scheduleSnoozedNotification({
     scheduledTime,
     _buildNotificationDetails(priority, snoozeMinutes: payload.snoozeMinutes),
     payload: payload.toJson(),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    androidScheduleMode: await _resolveAndroidScheduleModeForPlugin(),
   );
+}
+
+Future<AndroidScheduleMode> _resolveAndroidScheduleModeForPlugin() async {
+  final androidPlugin = _notificationsPlugin.resolvePlatformSpecificImplementation<
+    AndroidFlutterLocalNotificationsPlugin
+  >();
+  if (androidPlugin == null) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  final canScheduleExact = await androidPlugin.canScheduleExactNotifications();
+  if (canScheduleExact) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  await androidPlugin.requestExactAlarmsPermission();
+  final canScheduleAfterPrompt = await androidPlugin
+      .canScheduleExactNotifications();
+  if (canScheduleAfterPrompt) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  return AndroidScheduleMode.inexactAllowWhileIdle;
 }
 
 class NotificationEvent {
@@ -141,7 +164,7 @@ class NotificationService {
         snoozeMinutes: settings.defaultSnoozeMinutes,
       ),
       payload: payload.toJson(),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _resolveAndroidScheduleMode(),
     );
   }
 
@@ -223,7 +246,7 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       payload: '{"type":"comeback_reminder"}',
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _resolveAndroidScheduleMode(),
     );
   }
 
@@ -257,7 +280,7 @@ class NotificationService {
       scheduledTime,
       _buildClockNotificationDetails(),
       payload: payload,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _resolveAndroidScheduleMode(),
     );
   }
 
@@ -303,12 +326,17 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestExactAlarmsPermission();
 
     final iosPlugin = _notificationsPlugin
         .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
         >();
     await iosPlugin?.requestPermissions(alert: true, badge: true, sound: true);
+  }
+
+  Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
+    return _resolveAndroidScheduleModeForPlugin();
   }
 }
 
