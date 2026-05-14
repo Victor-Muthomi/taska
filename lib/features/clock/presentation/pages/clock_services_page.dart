@@ -409,7 +409,8 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       _alarms
         ..clear()
         ..addAll(restoredAlarms);
-      _nextAlarmId = math.max(1, math.max(state.nextAlarmId, _maxAlarmId(_alarms) + 1));
+      final nextAlarmIdCandidate = _maxAlarmId(_alarms) + 1;
+      _nextAlarmId = math.max(1, math.max(state.nextAlarmId, nextAlarmIdCandidate));
       _timerDuration = restoredTimerDuration;
       _timerRemaining = timerRunning ? restoredTimerRemaining : _timerDuration;
       _timerEndsAt = timerRunning ? restoredEndsAt : null;
@@ -465,10 +466,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
   }
 
   int _maxAlarmId(List<_AlarmEntry> alarms) {
-    if (alarms.isEmpty) {
-      return 0;
-    }
-    return alarms.map((alarm) => alarm.id).reduce(math.max);
+    return alarms.fold(0, (currentMax, alarm) => math.max(currentMax, alarm.id));
   }
 }
 
