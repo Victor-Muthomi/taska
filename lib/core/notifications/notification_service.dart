@@ -74,11 +74,6 @@ Future<AndroidScheduleMode> _resolveScheduleModeFromPlugin() async {
   if (requested == true) {
     return AndroidScheduleMode.exactAllowWhileIdle;
   }
-  final canScheduleAfterRequest =
-      await androidPlugin.canScheduleExactNotifications();
-  if (canScheduleAfterRequest) {
-    return AndroidScheduleMode.exactAllowWhileIdle;
-  }
 
   return AndroidScheduleMode.inexactAllowWhileIdle;
 }
