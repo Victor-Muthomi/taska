@@ -53,8 +53,29 @@ Future<void> _scheduleSnoozedNotification({
     scheduledTime,
     _buildNotificationDetails(priority, snoozeMinutes: payload.snoozeMinutes),
     payload: payload.toJson(),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    androidScheduleMode: await _resolveScheduleModeFromPlugin(),
   );
+}
+
+Future<AndroidScheduleMode> _resolveScheduleModeFromPlugin() async {
+  final androidPlugin = _notificationsPlugin.resolvePlatformSpecificImplementation<
+    AndroidFlutterLocalNotificationsPlugin
+  >();
+  if (androidPlugin == null) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  final canScheduleExact = await androidPlugin.canScheduleExactNotifications();
+  if (canScheduleExact) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  final requested = await androidPlugin.requestExactAlarmsPermission();
+  if (requested == true) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  return AndroidScheduleMode.inexactAllowWhileIdle;
 }
 
 class NotificationEvent {
@@ -141,7 +162,7 @@ class NotificationService {
         snoozeMinutes: settings.defaultSnoozeMinutes,
       ),
       payload: payload.toJson(),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _resolveScheduleModeFromPlugin(),
     );
   }
 
@@ -223,7 +244,7 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       payload: '{"type":"comeback_reminder"}',
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _resolveScheduleModeFromPlugin(),
     );
   }
 
@@ -257,7 +278,7 @@ class NotificationService {
       scheduledTime,
       _buildClockNotificationDetails(),
       payload: payload,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _resolveScheduleModeFromPlugin(),
     );
   }
 
@@ -303,6 +324,7 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestExactAlarmsPermission();
 
     final iosPlugin = _notificationsPlugin
         .resolvePlatformSpecificImplementation<
