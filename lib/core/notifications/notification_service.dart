@@ -164,7 +164,7 @@ class NotificationService {
         snoozeMinutes: settings.defaultSnoozeMinutes,
       ),
       payload: payload.toJson(),
-      androidScheduleMode: await _resolveAndroidScheduleMode(),
+      androidScheduleMode: await _resolveScheduleModeFromPlugin(),
     );
   }
 
@@ -246,7 +246,7 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       payload: '{"type":"comeback_reminder"}',
-      androidScheduleMode: await _resolveAndroidScheduleMode(),
+      androidScheduleMode: await _resolveScheduleModeFromPlugin(),
     );
   }
 
@@ -280,7 +280,7 @@ class NotificationService {
       scheduledTime,
       _buildClockNotificationDetails(),
       payload: payload,
-      androidScheduleMode: await _resolveAndroidScheduleMode(),
+      androidScheduleMode: await _resolveScheduleModeFromPlugin(),
     );
   }
 
@@ -333,10 +333,6 @@ class NotificationService {
           IOSFlutterLocalNotificationsPlugin
         >();
     await iosPlugin?.requestPermissions(alert: true, badge: true, sound: true);
-  }
-
-  Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
-    return _resolveScheduleModeFromPlugin();
   }
 }
 

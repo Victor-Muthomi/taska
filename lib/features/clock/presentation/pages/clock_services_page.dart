@@ -19,6 +19,7 @@ class ClockServicesPage extends ConsumerStatefulWidget {
 
 class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     with SingleTickerProviderStateMixin {
+  static const _maxTimerDurationSeconds = 359940; // 99:59:00
   static const _clockRuntimeStorage = ClockRuntimeStorage();
   static const _clockRuntimeService = ClockRuntimeService();
 
@@ -181,7 +182,10 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     if (_timerRunning) {
       return;
     }
-    final nextSeconds = (_timerDuration + delta).inSeconds.clamp(0, 359940);
+    final nextSeconds = (_timerDuration + delta).inSeconds.clamp(
+      0,
+      _maxTimerDurationSeconds,
+    );
     final next = Duration(seconds: nextSeconds);
     setState(() {
       _timerDuration = next;
@@ -390,7 +394,8 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     restoredAlarms.sort((a, b) => a.nextRingAt.compareTo(b.nextRingAt));
 
     final restoredTimerDuration = Duration(
-      seconds: state.timerDurationSeconds.clamp(0, 359940).toInt(),
+      seconds: state.timerDurationSeconds.clamp(0, _maxTimerDurationSeconds)
+          .toInt(),
     );
     final restoredEndsAtUtc = state.timerEndsAtUtcIso == null
         ? null
@@ -407,10 +412,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
         ..addAll(restoredAlarms);
       _nextAlarmId = math.max(
         state.nextAlarmId,
-        (_alarms.isEmpty
-                ? 0
-                : _alarms.map((alarm) => alarm.id).reduce(math.max)) +
-            1,
+        _maxAlarmId(_alarms) + 1,
       );
       _timerDuration = restoredTimerDuration;
       _timerRemaining = timerRunning ? restoredTimerRemaining : _timerDuration;
@@ -460,6 +462,13 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
           ? _clockRuntimeService.start()
           : _clockRuntimeService.stop(),
     );
+  }
+
+  int _maxAlarmId(List<_AlarmEntry> alarms) {
+    if (alarms.isEmpty) {
+      return 0;
+    }
+    return alarms.map((alarm) => alarm.id).reduce(math.max);
   }
 }
 
