@@ -434,7 +434,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       );
     }
 
-    _persistClockRuntimeState();
+    _syncRuntimeServiceState();
   }
 
   void _persistClockRuntimeState() {
@@ -457,6 +457,10 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
           : null,
     );
     unawaited(_clockRuntimeStorage.save(state));
+    _syncRuntimeServiceState();
+  }
+
+  void _syncRuntimeServiceState() {
     unawaited(
       (_timerRunning || _alarms.any((alarm) => alarm.enabled))
           ? _clockRuntimeService.start()

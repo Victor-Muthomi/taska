@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 class ClockRuntimeState {
@@ -102,7 +103,10 @@ class ClockRuntimeStorage {
         return ClockRuntimeState.initial();
       }
       return ClockRuntimeState.fromJson(json);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint(
+        'ClockRuntimeStorage.load failed: $error\n$stackTrace',
+      );
       return ClockRuntimeState.initial();
     }
   }
