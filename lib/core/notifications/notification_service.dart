@@ -53,11 +53,11 @@ Future<void> _scheduleSnoozedNotification({
     scheduledTime,
     _buildNotificationDetails(priority, snoozeMinutes: payload.snoozeMinutes),
     payload: payload.toJson(),
-    androidScheduleMode: await _resolveAndroidScheduleModeForPlugin(),
+    androidScheduleMode: await _resolveScheduleModeFromPlugin(),
   );
 }
 
-Future<AndroidScheduleMode> _resolveAndroidScheduleModeForPlugin() async {
+Future<AndroidScheduleMode> _resolveScheduleModeFromPlugin() async {
   final androidPlugin = _notificationsPlugin.resolvePlatformSpecificImplementation<
     AndroidFlutterLocalNotificationsPlugin
   >();
@@ -71,8 +71,8 @@ Future<AndroidScheduleMode> _resolveAndroidScheduleModeForPlugin() async {
   }
 
   await androidPlugin.requestExactAlarmsPermission();
-  final canScheduleAfterPrompt = await androidPlugin
-      .canScheduleExactNotifications();
+  final canScheduleAfterPrompt =
+      await androidPlugin.canScheduleExactNotifications();
   if (canScheduleAfterPrompt) {
     return AndroidScheduleMode.exactAllowWhileIdle;
   }
@@ -336,7 +336,7 @@ class NotificationService {
   }
 
   Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
-    return _resolveAndroidScheduleModeForPlugin();
+    return _resolveScheduleModeFromPlugin();
   }
 }
 
