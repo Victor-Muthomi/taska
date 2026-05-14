@@ -112,8 +112,14 @@ class ClockRuntimeStorage {
   }
 
   Future<void> save(ClockRuntimeState state) async {
-    final file = await _stateFile();
-    await file.writeAsString(jsonEncode(state.toJson()));
+    try {
+      final file = await _stateFile();
+      await file.writeAsString(jsonEncode(state.toJson()));
+    } catch (error, stackTrace) {
+      debugPrint(
+        'ClockRuntimeStorage.save failed: $error\n$stackTrace',
+      );
+    }
   }
 
   Future<File> _stateFile() async {

@@ -56,7 +56,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- dataSync is used as the closest stable FGS type for active local clock runtime work -->
+        <!-- foregroundServiceType="dataSync" is used as the closest stable type for active local clock runtime work -->
         <service
             android:name=".ClockRuntimeForegroundService"
             android:exported="false"

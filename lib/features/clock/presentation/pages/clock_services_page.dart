@@ -394,8 +394,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     restoredAlarms.sort((a, b) => a.nextRingAt.compareTo(b.nextRingAt));
 
     final restoredTimerDuration = Duration(
-      seconds: state.timerDurationSeconds.clamp(0, _maxTimerDurationSeconds)
-          .toInt(),
+      seconds: state.timerDurationSeconds.clamp(0, _maxTimerDurationSeconds),
     );
     final restoredEndsAtUtc = state.timerEndsAtUtcIso == null
         ? null
