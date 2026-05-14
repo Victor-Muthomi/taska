@@ -70,7 +70,10 @@ Future<AndroidScheduleMode> _resolveScheduleModeFromPlugin() async {
     return AndroidScheduleMode.exactAllowWhileIdle;
   }
 
-  await androidPlugin.requestExactAlarmsPermission();
+  final requested = await androidPlugin.requestExactAlarmsPermission();
+  if (requested == true) {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
   final canScheduleAfterPrompt =
       await androidPlugin.canScheduleExactNotifications();
   if (canScheduleAfterPrompt) {

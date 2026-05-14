@@ -19,7 +19,7 @@ class ClockServicesPage extends ConsumerStatefulWidget {
 
 class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     with SingleTickerProviderStateMixin {
-  static const _maxTimerDurationSeconds = 359940; // 99:59:00
+  static const _maxTimerDurationSeconds = 359940; // 99h 59m
   static const _clockRuntimeStorage = ClockRuntimeStorage();
   static const _clockRuntimeService = ClockRuntimeService();
 
@@ -409,10 +409,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       _alarms
         ..clear()
         ..addAll(restoredAlarms);
-      _nextAlarmId = math.max(
-        state.nextAlarmId,
-        _maxAlarmId(_alarms) + 1,
-      );
+      _nextAlarmId = math.max(1, math.max(state.nextAlarmId, _maxAlarmId(_alarms) + 1));
       _timerDuration = restoredTimerDuration;
       _timerRemaining = timerRunning ? restoredTimerRemaining : _timerDuration;
       _timerEndsAt = timerRunning ? restoredEndsAt : null;
