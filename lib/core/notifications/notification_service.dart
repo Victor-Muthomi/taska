@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -16,6 +17,26 @@ final FlutterLocalNotificationsPlugin _notificationsPlugin =
 const int _comebackReminderNotificationId = 9000001;
 const int _clockTimerNotificationId = 9100001;
 const int _clockAlarmNotificationIdBase = 9200000;
+const String _clockAlarmChannelId = 'taska_clock_alarm_v2';
+const String _clockTimerChannelId = 'taska_clock_timer_v2';
+const RawResourceAndroidNotificationSound _clockAlarmSound =
+    RawResourceAndroidNotificationSound('taska_alarm');
+const RawResourceAndroidNotificationSound _clockTimerSound =
+    RawResourceAndroidNotificationSound('taska_timer');
+final Int64List _clockAlarmVibrationPattern = Int64List.fromList([
+  0,
+  900,
+  350,
+  900,
+  350,
+  900,
+]);
+final Int64List _clockTimerVibrationPattern = Int64List.fromList([
+  0,
+  450,
+  200,
+  450,
+]);
 
 @pragma('vm:entry-point')
 Future<void> notificationTapBackground(NotificationResponse response) async {
@@ -160,6 +181,7 @@ class NotificationService {
       body: 'It is $timeLabel.',
       scheduledAt: scheduledAt,
       payload: '{"type":"clock_alarm","alarmId":$alarmId}',
+      type: _ClockNotificationType.alarm,
     );
   }
 
@@ -170,13 +192,18 @@ class NotificationService {
   Future<void> scheduleClockTimer({
     required DateTime scheduledAt,
     required Duration duration,
+    String? timerName,
   }) async {
+    final timerLabel = timerName?.trim().isNotEmpty == true
+        ? '${timerName!.trim()} timer'
+        : '${_formatClockDuration(duration)} countdown';
     await _scheduleClockNotification(
       id: _clockTimerNotificationId,
       title: 'Taska timer finished',
-      body: 'Your ${_formatClockDuration(duration)} countdown is complete.',
+      body: 'Your $timerLabel is complete.',
       scheduledAt: scheduledAt,
       payload: '{"type":"clock_timer"}',
+      type: _ClockNotificationType.timer,
     );
   }
 
@@ -237,6 +264,7 @@ class NotificationService {
     required String body,
     required DateTime scheduledAt,
     required String payload,
+    required _ClockNotificationType type,
   }) async {
     final scheduledTime = tz.TZDateTime.from(scheduledAt, tz.local);
     if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
@@ -244,7 +272,7 @@ class NotificationService {
         id,
         title,
         body,
-        _buildClockNotificationDetails(),
+        _buildClockNotificationDetails(type),
         payload: payload,
       );
       return;
@@ -255,7 +283,7 @@ class NotificationService {
       title,
       body,
       scheduledTime,
-      _buildClockNotificationDetails(),
+      _buildClockNotificationDetails(type),
       payload: payload,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
@@ -295,6 +323,33 @@ class NotificationService {
         ),
       );
     }
+
+    await androidPlugin.createNotificationChannel(
+      AndroidNotificationChannel(
+        _clockAlarmChannelId,
+        'Clock Alarms',
+        description: 'Alarm alerts that use the Taska alarm tone.',
+        importance: Importance.max,
+        playSound: true,
+        sound: _clockAlarmSound,
+        enableVibration: true,
+        vibrationPattern: _clockAlarmVibrationPattern,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+    await androidPlugin.createNotificationChannel(
+      AndroidNotificationChannel(
+        _clockTimerChannelId,
+        'Clock Timers',
+        description: 'Timer alerts that use the Taska timer bell.',
+        importance: Importance.max,
+        playSound: true,
+        sound: _clockTimerSound,
+        enableVibration: true,
+        vibrationPattern: _clockTimerVibrationPattern,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
   }
 
   Future<void> _requestPermissions() async {
@@ -312,17 +367,36 @@ class NotificationService {
   }
 }
 
-NotificationDetails _buildClockNotificationDetails() {
-  return const NotificationDetails(
+enum _ClockNotificationType { alarm, timer }
+
+NotificationDetails _buildClockNotificationDetails(
+  _ClockNotificationType type,
+) {
+  final isAlarm = type == _ClockNotificationType.alarm;
+  return NotificationDetails(
     android: AndroidNotificationDetails(
-      'taska_high_priority',
-      'Urgent Reminders',
-      channelDescription:
-          'High priority reminders for tasks that need attention.',
+      isAlarm ? _clockAlarmChannelId : _clockTimerChannelId,
+      isAlarm ? 'Clock Alarms' : 'Clock Timers',
+      channelDescription: isAlarm
+          ? 'Alarm alerts that use the Taska alarm tone.'
+          : 'Timer alerts that use the Taska timer bell.',
       importance: Importance.max,
       priority: Priority.max,
+      category: AndroidNotificationCategory.alarm,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
+      playSound: true,
+      sound: isAlarm ? _clockAlarmSound : _clockTimerSound,
+      enableVibration: true,
+      vibrationPattern: isAlarm
+          ? _clockAlarmVibrationPattern
+          : _clockTimerVibrationPattern,
     ),
-    iOS: DarwinNotificationDetails(),
+    iOS: const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBanner: true,
+      presentList: true,
+      presentSound: true,
+    ),
   );
 }
 

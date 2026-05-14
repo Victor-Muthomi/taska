@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/notifications/notification_providers.dart';
 
@@ -22,6 +23,10 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
   final List<_AlarmEntry> _alarms = [];
   int _nextAlarmId = 1;
 
+  final List<_NamedTimer> _namedTimers = [];
+  int _nextNamedTimerId = 1;
+  int? _activeNamedTimerId;
+  String _timerName = 'Timer';
   Duration _timerDuration = const Duration(minutes: 5);
   Duration _timerRemaining = const Duration(minutes: 5);
   DateTime? _timerEndsAt;
@@ -90,14 +95,22 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
               children: [
                 _AlarmPanel(
                   alarms: _alarms,
+                  nextAlarm: _nextEnabledAlarm,
+                  nextAlarmRemaining: _nextAlarmRemaining,
                   onAddAlarm: _addAlarm,
                   onToggleAlarm: _toggleAlarm,
                   onDeleteAlarm: _deleteAlarm,
                 ),
                 _TimerPanel(
+                  timerName: _timerName,
                   duration: _timerDuration,
                   remaining: _timerRemaining,
                   running: _timerRunning,
+                  namedTimers: _namedTimers,
+                  activeNamedTimerId: _activeNamedTimerId,
+                  onAddTimer: _addNamedTimer,
+                  onSelectTimer: _selectNamedTimer,
+                  onDeleteTimer: _deleteNamedTimer,
                   onAdjustDuration: _adjustTimerDuration,
                   onStartPause: _toggleTimer,
                   onReset: _resetTimer,
@@ -167,6 +180,43 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     _cancelAlarmNotification(alarm);
   }
 
+  Future<void> _addNamedTimer() async {
+    final draft = await _showNamedTimerDialog();
+    if (draft == null) {
+      return;
+    }
+
+    final namedTimer = _NamedTimer(
+      id: _nextNamedTimerId++,
+      name: draft.name,
+      duration: draft.duration,
+    );
+
+    setState(() {
+      _namedTimers.add(namedTimer);
+      if (!_timerRunning) {
+        _applyNamedTimer(namedTimer);
+      }
+    });
+  }
+
+  void _selectNamedTimer(_NamedTimer timer) {
+    if (_timerRunning) {
+      return;
+    }
+    setState(() => _applyNamedTimer(timer));
+  }
+
+  void _deleteNamedTimer(_NamedTimer timer) {
+    setState(() {
+      _namedTimers.removeWhere((entry) => entry.id == timer.id);
+      if (_activeNamedTimerId == timer.id) {
+        _activeNamedTimerId = null;
+        _timerName = 'Timer';
+      }
+    });
+  }
+
   void _adjustTimerDuration(Duration delta) {
     if (_timerRunning) {
       return;
@@ -174,6 +224,8 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
     final nextSeconds = (_timerDuration + delta).inSeconds.clamp(0, 359940);
     final next = Duration(seconds: nextSeconds);
     setState(() {
+      _activeNamedTimerId = null;
+      _timerName = 'Custom timer';
       _timerDuration = next;
       _timerRemaining = next;
     });
@@ -253,7 +305,6 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       if (alarm.enabled && !now.isBefore(alarm.nextRingAt)) {
         triggeredAlarms.add(alarm);
         _alarms[i] = alarm.copyWith(enabled: false);
-        _cancelAlarmNotification(alarm);
         shouldSetState = true;
       }
     }
@@ -270,13 +321,17 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
         _timerEndsAt = null;
         shouldSetState = true;
         _cancelTimerNotification();
-        _showClockAlert('Timer finished', 'Your countdown is complete.');
+        _showClockAlert('$_timerName finished', 'Your countdown is complete.');
       }
     }
 
     if (_stopwatchRunning && _stopwatchStartedAt != null) {
       _stopwatchElapsed =
           _stopwatchElapsedBeforeStart + now.difference(_stopwatchStartedAt!);
+      shouldSetState = true;
+    }
+
+    if (_nextEnabledAlarm != null) {
       shouldSetState = true;
     }
 
@@ -296,6 +351,36 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
       next = next.add(const Duration(days: 1));
     }
     return next;
+  }
+
+  _AlarmEntry? get _nextEnabledAlarm {
+    final enabledAlarms = _alarms.where((alarm) => alarm.enabled).toList()
+      ..sort((a, b) => a.nextRingAt.compareTo(b.nextRingAt));
+    return enabledAlarms.isEmpty ? null : enabledAlarms.first;
+  }
+
+  Duration? get _nextAlarmRemaining {
+    final nextAlarm = _nextEnabledAlarm;
+    if (nextAlarm == null) {
+      return null;
+    }
+    final remaining = nextAlarm.nextRingAt.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  void _applyNamedTimer(_NamedTimer timer) {
+    _activeNamedTimerId = timer.id;
+    _timerName = timer.name;
+    _timerDuration = timer.duration;
+    _timerRemaining = timer.duration;
+    _timerEndsAt = null;
+  }
+
+  Future<_NamedTimerDraft?> _showNamedTimerDialog() async {
+    return showDialog<_NamedTimerDraft>(
+      context: context,
+      builder: (context) => const _NamedTimerDialog(),
+    );
   }
 
   void _showClockAlert(String title, String message) {
@@ -338,6 +423,7 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
           .scheduleClockTimer(
             scheduledAt: timerEndsAt,
             duration: _timerRemaining,
+            timerName: _timerName,
           ),
     );
   }
@@ -350,12 +436,16 @@ class _ClockServicesPageState extends ConsumerState<ClockServicesPage>
 class _AlarmPanel extends StatelessWidget {
   const _AlarmPanel({
     required this.alarms,
+    required this.nextAlarm,
+    required this.nextAlarmRemaining,
     required this.onAddAlarm,
     required this.onToggleAlarm,
     required this.onDeleteAlarm,
   });
 
   final List<_AlarmEntry> alarms;
+  final _AlarmEntry? nextAlarm;
+  final Duration? nextAlarmRemaining;
   final VoidCallback onAddAlarm;
   final void Function(_AlarmEntry alarm, bool enabled) onToggleAlarm;
   final ValueChanged<_AlarmEntry> onDeleteAlarm;
@@ -375,6 +465,20 @@ class _AlarmPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        if (nextAlarm != null && nextAlarmRemaining != null) ...[
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: Text(
+                'Next alarm in ${_formatRemaining(nextAlarmRemaining!)}',
+              ),
+              subtitle: Text(
+                '${_formatTimeOfDay(nextAlarm!.time)} - ${_relativeDayLabel(nextAlarm!.nextRingAt)}',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (alarms.isEmpty)
           const _EmptyClockCard(
             icon: Icons.alarm_off_outlined,
@@ -425,17 +529,29 @@ class _AlarmPanel extends StatelessWidget {
 
 class _TimerPanel extends StatelessWidget {
   const _TimerPanel({
+    required this.timerName,
     required this.duration,
     required this.remaining,
     required this.running,
+    required this.namedTimers,
+    required this.activeNamedTimerId,
+    required this.onAddTimer,
+    required this.onSelectTimer,
+    required this.onDeleteTimer,
     required this.onAdjustDuration,
     required this.onStartPause,
     required this.onReset,
   });
 
+  final String timerName;
   final Duration duration;
   final Duration remaining;
   final bool running;
+  final List<_NamedTimer> namedTimers;
+  final int? activeNamedTimerId;
+  final VoidCallback onAddTimer;
+  final ValueChanged<_NamedTimer> onSelectTimer;
+  final ValueChanged<_NamedTimer> onDeleteTimer;
   final ValueChanged<Duration> onAdjustDuration;
   final VoidCallback onStartPause;
   final VoidCallback onReset;
@@ -449,19 +565,26 @@ class _TimerPanel extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       children: [
-        const _PanelHeader(
+        _PanelHeader(
           title: 'Timer',
           subtitle: 'Run a focused countdown without leaving Taska.',
+          action: FilledButton.icon(
+            onPressed: onAddTimer,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add'),
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                Text(timerName, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
                 SizedBox(
-                  height: 164,
-                  width: 164,
+                  height: 136,
+                  width: 136,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -481,7 +604,7 @@ class _TimerPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
                   spacing: 8,
@@ -513,7 +636,7 @@ class _TimerPanel extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -541,7 +664,170 @@ class _TimerPanel extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        if (namedTimers.isEmpty)
+          const _EmptyClockCard(
+            icon: Icons.timer_outlined,
+            title: 'No named timers',
+            subtitle:
+                'Add reusable timers for breaks, focus blocks, or chores.',
+          )
+        else
+          Card(
+            child: Column(
+              children: [
+                for (final timer in namedTimers)
+                  ListTile(
+                    leading: Icon(
+                      timer.id == activeNamedTimerId
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.timer_outlined,
+                    ),
+                    title: Text(timer.name),
+                    subtitle: Text(_formatDuration(timer.duration)),
+                    onTap: running ? null : () => onSelectTimer(timer),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        IconButton(
+                          onPressed: running
+                              ? null
+                              : () => onSelectTimer(timer),
+                          icon: const Icon(Icons.play_circle_outline_rounded),
+                          tooltip: 'Use timer',
+                        ),
+                        IconButton(
+                          onPressed: () => onDeleteTimer(timer),
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          tooltip: 'Delete timer',
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
       ],
+    );
+  }
+}
+
+class _NamedTimerDialog extends StatefulWidget {
+  const _NamedTimerDialog();
+
+  @override
+  State<_NamedTimerDialog> createState() => _NamedTimerDialogState();
+}
+
+class _NamedTimerDialogState extends State<_NamedTimerDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _hoursController = TextEditingController(text: '0');
+  final _minutesController = TextEditingController(text: '5');
+  final _secondsController = TextEditingController(text: '0');
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _hoursController.dispose();
+    _minutesController.dispose();
+    _secondsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add timer'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Name'),
+              textCapitalization: TextCapitalization.sentences,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Name this timer';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _DurationField(
+                    controller: _hoursController,
+                    label: 'Hours',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DurationField(
+                    controller: _minutesController,
+                    label: 'Minutes',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DurationField(
+                    controller: _secondsController,
+                    label: 'Seconds',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Add')),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) {
+      return;
+    }
+    final duration = Duration(
+      hours: int.tryParse(_hoursController.text) ?? 0,
+      minutes: int.tryParse(_minutesController.text) ?? 0,
+      seconds: int.tryParse(_secondsController.text) ?? 0,
+    );
+    if (duration == Duration.zero) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a timer longer than zero.')),
+      );
+      return;
+    }
+    Navigator.of(context).pop(
+      _NamedTimerDraft(name: _nameController.text.trim(), duration: duration),
+    );
+  }
+}
+
+class _DurationField extends StatelessWidget {
+  const _DurationField({required this.controller, required this.label});
+
+  final TextEditingController controller;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(labelText: label),
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
     );
   }
 }
@@ -743,6 +1029,25 @@ class _AlarmEntry {
   }
 }
 
+class _NamedTimer {
+  const _NamedTimer({
+    required this.id,
+    required this.name,
+    required this.duration,
+  });
+
+  final int id;
+  final String name;
+  final Duration duration;
+}
+
+class _NamedTimerDraft {
+  const _NamedTimerDraft({required this.name, required this.duration});
+
+  final String name;
+  final Duration duration;
+}
+
 String _formatTimeOfDay(TimeOfDay time) {
   final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
   final minute = time.minute.toString().padLeft(2, '0');
@@ -773,6 +1078,23 @@ String _formatDuration(Duration duration) {
     return '$hours:$minutes:$seconds';
   }
   return '$minutes:$seconds';
+}
+
+String _formatRemaining(Duration duration) {
+  final days = duration.inDays;
+  final hours = duration.inHours.remainder(24);
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+  if (days > 0) {
+    return '${days}d ${hours}h';
+  }
+  if (hours > 0) {
+    return '${hours}h ${minutes}m';
+  }
+  if (minutes > 0) {
+    return '${minutes}m ${seconds}s';
+  }
+  return '${seconds}s';
 }
 
 String _formatStopwatch(Duration duration) {

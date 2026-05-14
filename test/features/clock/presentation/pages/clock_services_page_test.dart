@@ -62,16 +62,48 @@ void main() {
       _clockTestApp(initialTabIndex: 1, notifications: notifications),
     );
 
+    await tester.ensureVisible(find.byIcon(Icons.play_arrow_rounded));
     await tester.tap(find.byIcon(Icons.play_arrow_rounded));
     await tester.pump();
 
     expect(notifications.scheduledTimerCount, 1);
     expect(notifications.lastTimerDuration, const Duration(minutes: 5));
 
+    await tester.ensureVisible(find.byTooltip('Reset timer'));
     await tester.tap(find.byTooltip('Reset timer'));
     await tester.pump();
 
     expect(notifications.canceledTimerCount, 1);
+  });
+
+  testWidgets('custom named timer can be added and started', (
+    WidgetTester tester,
+  ) async {
+    final notifications = _FakeClockNotificationService();
+
+    await tester.pumpWidget(
+      _clockTestApp(initialTabIndex: 1, notifications: notifications),
+    );
+
+    await tester.ensureVisible(find.byIcon(Icons.add_rounded));
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Name'), 'Tea');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Minutes'), '3');
+    await tester.tap(find.text('Add').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tea'), findsWidgets);
+    expect(find.text('03:00'), findsOneWidget);
+
+    await tester.ensureVisible(find.byIcon(Icons.play_arrow_rounded));
+    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    await tester.pump();
+
+    expect(notifications.scheduledTimerCount, 1);
+    expect(notifications.lastTimerDuration, const Duration(minutes: 3));
+    expect(notifications.lastTimerName, 'Tea');
   });
 }
 
@@ -94,14 +126,17 @@ class _FakeClockNotificationService extends NotificationService {
   int scheduledTimerCount = 0;
   int canceledTimerCount = 0;
   Duration? lastTimerDuration;
+  String? lastTimerName;
 
   @override
   Future<void> scheduleClockTimer({
     required DateTime scheduledAt,
     required Duration duration,
+    String? timerName,
   }) async {
     scheduledTimerCount += 1;
     lastTimerDuration = duration;
+    lastTimerName = timerName;
   }
 
   @override
